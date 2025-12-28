@@ -16,6 +16,9 @@ statrs = "0.16"
 ringbuf = "0.3"
 itertools = "0.12"   # Statistical distributions
 tokio-stream = "0.1"
+futures-util = "0.3"
+tokio-tungstenite = { version = "0.20", features = ["native-tls"] }
+url = "2.5"
 
 # The Memory (Data)
 polars = { version = "0.36", features = ["lazy", "temporal"] }
