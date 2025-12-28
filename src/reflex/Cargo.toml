@@ -11,6 +11,8 @@ prost = "0.12"
 
 # The Physics Engine (Math)
 ndarray = "0.15" # O(1) Matrix operations
+ndarray-rand = "0.14"
+rand = "0.8"
 nalgebra = "0.32" # Linear Algebra
 statrs = "0.16"
 ringbuf = "0.3"

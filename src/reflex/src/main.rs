@@ -18,6 +18,7 @@ pub mod market;
 pub mod ingest;
 pub mod ledger;
 pub mod taleb;
+pub mod simons;
 mod server;
 
 #[tokio::main]
@@ -34,8 +35,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut physics = feynman::PhysicsEngine::new(2000); // 2000 tick capacity
     let mut _ledger = ledger::AccountState::new(0.0, 0.0); // Shadow Ledger (Empty init)
     let _risk = taleb::RiskGuardian::new(); // Taleb
+    let mut simons = simons::EchoStateNetwork::new(100); // Simons (100 neurons)
     
     info!("🛡️ Taleb Risk Engine: ARMED");
+    info!("🧠 Simons Pattern Matcher: ONLINE (N=100)");
 
     // 4. Ingest (Eyes)
     let (tx, mut rx) = tokio::sync::mpsc::channel(100);
@@ -52,12 +55,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // A. Update Physics (Feynman)
             let state = physics.update(tick.price, tick.timestamp);
             
-            // B. Log "Significant Events"
+            // B. Simons (Pattern Matcher)
+            // Train on current observation (Velocity) - "Thinking Fast"
+            simons.train(state.velocity);
+            let prediction = simons.forward(state.velocity);
+
+            // C. Log "Significant Events"
             // Threshold: Velocity > $1.0/sec or Acceleration > $0.1/sec^2
             if state.velocity.abs() > 1.0 || state.acceleration.abs() > 0.1 || state.jerk.abs() > 0.1 {
                  info!(
-                    "REFLEX EVENT: p={:.2} v={:.2} a={:.2} j={:.2} H={:.2} ER={:.2}",
-                    state.price, state.velocity, state.acceleration, state.jerk, state.entropy, state.efficiency_index
+                    "REFLEX EVENT: v={:.2} (Pred={:.2}) a={:.2} H={:.2}",
+                    state.velocity, prediction, state.acceleration, state.entropy
                 );
             }
         }
