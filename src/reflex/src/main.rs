@@ -29,7 +29,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     info!("ReflexD listening on {}", addr);
 
     // 3. Reflex Core Init
-    let mut physics = feynman::PhysicsEngine::new(1000); // 1000 tick history
+    let mut physics = feynman::PhysicsEngine::new(2000); // 2000 tick capacity
     
     // 4. Ingest (Eyes)
     let (tx, mut rx) = tokio::sync::mpsc::channel(100);
@@ -46,18 +46,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             // A. Update Physics (Feynman)
             let state = physics.update(tick.price, tick.timestamp);
             
-            // B. Log (Telemetry) - throttle logs if needed, but for verification: log all
-            // Format: [PHYSICS] t=... p=... v=... a=... j=... H=... ER=...
-            info!(
-                "REFLEX PHYSICS: p={:.2} v={:.4} a={:.4} j={:.4} H={:.2} ER={:.2} | Vol={:.4}",
-                state.price,
-                state.velocity,
-                state.acceleration,
-                state.jerk,
-                state.entropy,
-                state.efficiency_index,
-                state.volatility
-            );
+            // B. Log "Significant Events"
+            // Threshold: Velocity > $1.0/sec or Acceleration > $0.1/sec^2
+            if state.velocity.abs() > 1.0 || state.acceleration.abs() > 0.1 || state.jerk.abs() > 0.1 {
+                 info!(
+                    "REFLEX EVENT: p={:.2} v={:.2} a={:.2} j={:.2} H={:.2} ER={:.2}",
+                    state.price, state.velocity, state.acceleration, state.jerk, state.entropy, state.efficiency_index
+                );
+            }
         }
     });
 
