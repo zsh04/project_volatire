@@ -14,6 +14,7 @@ pub struct PhysicsState {
     pub jerk: f64,          // $j = da/dt$
     pub volatility: f64,    // Realized Volatility ($\sigma$)
     pub entropy: f64,       // Shannon Entropy ($H$)
+    pub efficiency_index: f64, // Kaufman Efficiency Ratio
 }
 
 impl Default for PhysicsState {
@@ -26,6 +27,7 @@ impl Default for PhysicsState {
             jerk: 0.0,
             volatility: 0.0,
             entropy: 0.0,
+            efficiency_index: 0.0,
         }
     }
 }
@@ -65,21 +67,19 @@ impl PhysicsEngine {
         
         // Guard: Zero Time Delta (Microsecond collision)
         if dt <= 0.0 && self.count > 0 {
-            // Return previous state to avoid Division by Zero
-            // Update price but keep derivatives static (or zero them? static is safer for continuity)
+            // Return previous state with new price to avoid DivByZero
             let mut safe_state = self.prev_state;
             safe_state.price = price; 
             return safe_state;
         }
 
-        // 2. Update History (For Entropy)
+        // 2. Update History
         if self.history.len() >= self.window_size {
             self.history.pop_front();
         }
         self.history.push_back((timestamp, price));
 
         // 3. Welford's Algorithm (Volatility)
-        // We track returns for volatility, not raw price
         let return_val = if self.prev_state.price != 0.0 {
             (price - self.prev_state.price) / self.prev_state.price
         } else {
@@ -107,6 +107,9 @@ impl PhysicsEngine {
         // 5. Entropy (Shannon)
         let entropy = self.calculate_entropy();
 
+        // 6. Efficiency Index (Kaufman)
+        let efficiency_index = self.calculate_efficiency();
+
         let new_state = PhysicsState {
             timestamp,
             price,
@@ -115,6 +118,7 @@ impl PhysicsEngine {
             jerk,
             volatility,
             entropy,
+            efficiency_index,
         };
 
         self.prev_state = new_state;
@@ -130,7 +134,7 @@ impl PhysicsEngine {
         // Simple Histogram approach: 10 bins
         let returns: Vec<f64> = self.history.iter()
             .zip(self.history.iter().skip(1))
-            .map(|(prev, curr)| curr.1 - prev.1) // Absolute differences for simplicity in this context
+            .map(|(prev, curr)| curr.1 - prev.1) 
             .collect();
         
         if returns.is_empty() { return 0.0; }
@@ -139,7 +143,7 @@ impl PhysicsEngine {
         let max = returns.iter().fold(f64::NEG_INFINITY, |a, &b| a.max(b));
         
         if (max - min).abs() < f64::EPSILON {
-            return 0.0; // No variation = Zero entropy
+            return 0.0; // No variation
         }
 
         let bins = 10;
@@ -164,6 +168,33 @@ impl PhysicsEngine {
         
         entropy
     }
+
+    fn calculate_efficiency(&self) -> f64 {
+        // Kaufman Efficiency Ratio (ER)
+        // ER = |Direction| / Volatility
+        // Direction = Price_t - Price_{t-n}
+        // Volatility = Sum(|Price_i - Price_{i-1}|)
+        
+        if self.history.len() < 5 { return 0.0; }
+        
+        let start_price = self.history.front().unwrap().1;
+        let end_price = self.history.back().unwrap().1;
+        
+        let direction = (end_price - start_price).abs();
+        
+        // Sum of absolute changes
+        let volatility: f64 = self.history.iter()
+            .zip(self.history.iter().skip(1))
+            .map(|(prev, curr)| (curr.1 - prev.1).abs())
+            .sum();
+
+        if volatility < f64::EPSILON {
+            if direction > 0.0 { return 1.0; } // Pure jump?
+            return 0.0;
+        }
+
+        direction / volatility
+    }
 }
 
 // ==============================================================================
@@ -185,17 +216,17 @@ mod tests {
         // t=1, p=1 (v=1, a=0)
         let s1 = engine.update(1.0, 1.0);
         assert_eq!(s1.velocity, 1.0);
-        assert_eq!(s1.acceleration, 1.0); // First step accl is 1.0 because prev v was 0
+        assert_eq!(s1.acceleration, 1.0); // First step accl is 1.0
 
         // t=2, p=2 (v=1, a=0)
         let s2 = engine.update(2.0, 2.0);
         assert_eq!(s2.velocity, 1.0);
-        assert_eq!(s2.acceleration, 0.0); // Now it stabilizes
-        assert_eq!(s2.jerk, -1.0); // Decelerating from initial acceleration
+        assert_eq!(s2.acceleration, 0.0); 
+        assert_eq!(s2.jerk, -1.0); 
         
         // t=3, p=3 (v=1, a=0, j=0)
         let s3 = engine.update(3.0, 3.0);
-        assert_eq!(s3.jerk, 0.0); // Stabilized
+        assert_eq!(s3.jerk, 0.0); 
     }
 
     #[test]
@@ -204,13 +235,10 @@ mod tests {
         // Base state
         engine.update(100.0, 0.0);
         engine.update(100.0, 1.0);
-        engine.update(100.0, 2.0); // v=0, a=0
+        engine.update(100.0, 2.0); // v=0
 
         // Sudden Spike
         let s = engine.update(110.0, 3.0);
-        // v = 10/1 = 10
-        // a = (10 - 0)/1 = 10
-        // j = (10 - 0)/1 = 10
         assert_eq!(s.velocity, 10.0);
         assert_eq!(s.acceleration, 10.0);
         assert_eq!(s.jerk, 10.0);
@@ -233,11 +261,39 @@ mod tests {
         engine.update(100.0, 1.0);
         let s = engine.update(105.0, 1.0); // Same timestamp!
         
-        // Should not explode (NaN)
         assert!(!s.velocity.is_nan());
         assert_eq!(s.price, 105.0);
-        // Should return previous velocity
-        // Wait, logic says return previous state explicitly with new price
-        // Previous state v was infinity? No, first update v is 0.
+    }
+
+    #[test]
+    fn test_efficiency_ratio() {
+        let mut engine = PhysicsEngine::new(10);
+        
+        // 1. Trending (Linear) -> ER = 1.0
+        // Prices: 0, 1, 2, 3, 4, 5
+        // Direction = |5 - 0| = 5
+        // Volatility = |1-0| + |2-1| + ... = 1+1+1+1+1 = 5
+        // ER = 5/5 = 1.0
+        for i in 0..=5 {
+            engine.update(i as f64, i as f64);
+        }
+        let s = engine.update(6.0, 6.0);
+        assert!((s.efficiency_index - 1.0).abs() < 1e-6, "Linear trend should have ER=1");
+
+        // 2. Chopping -> ER Low
+        // Prices: 10, 11, 10, 11, 10, 11
+        // Direction (start to end) = |11 - 10| = 1
+        // Volatility = |11-10| + |10-11| + ... = 1+1+1+1+1 = 5
+        // ER = 1/5 = 0.2
+        let mut engine_chop = PhysicsEngine::new(10);
+        engine_chop.update(10.0, 0.0);
+        engine_chop.update(11.0, 1.0); // +1
+        engine_chop.update(10.0, 2.0); // +1
+        engine_chop.update(11.0, 3.0); // +1
+        engine_chop.update(10.0, 4.0); // +1
+        let s_chop = engine_chop.update(11.0, 5.0); // +1
+        
+        // Direction = |11-10| = 1. Vol = 5. ER = 0.2.
+        assert!((s_chop.efficiency_index - 0.2).abs() < 1e-6);
     }
 }
