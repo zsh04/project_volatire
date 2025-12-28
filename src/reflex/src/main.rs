@@ -13,6 +13,7 @@ pub mod brain_proto {
 }
 
 // Declare local modules
+pub mod feynman;
 mod server;
 
 #[tokio::main]
