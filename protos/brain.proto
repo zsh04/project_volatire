@@ -40,6 +40,8 @@ message StateVector {
     double price = 1;
     double velocity = 2;
     double vol_cluster = 3;
+    double entropy = 4;
+    double simons_prediction = 5;
 }
 
 message StrategyIntent {
