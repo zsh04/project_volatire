@@ -29,11 +29,11 @@ dependencies = [
     "structlog>=23.2.0"
 ]
 
-# New Standard for uv dev dependencies
 [dependency-groups]
 dev = [
     "ruff>=0.1.0",
-    "mypy>=1.7.0"
+    "mypy>=1.7.0",
+    "mypy-protobuf>=3.5.0" # <--- THE MISSING LINK
 ]
 
 [tool.mypy]

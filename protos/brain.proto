@@ -1,24 +1,62 @@
 syntax = "proto3";
+
 package brain;
 
-// The Strategy Service (Python)
+// The Brain Service (The Mind)
+// Responsible for Reasoning, Forecasting, and Context.
 service BrainService {
-  // Reflex sends State, Brain returns Strategy
-  rpc Pulse (StateVector) returns (StrategyIntent);
+    // Pulse: Reflex sends a heartbeat to prove Consciousness is awake.
+    rpc Heartbeat (Pulse) returns (PulseAck);
+
+    // Event: Reflex notifies Brain of a Market Regime Change.
+    rpc NotifyRegimeChange (RegimeEvent) returns (Empty);
+
+    // Decision: Reflex asks Brain for a strategy decision based on state.
+    rpc Reason (StateVector) returns (StrategyIntent);
+
+    // Prediction: Reflex asks Brain to forecast future price/volatility.
+    rpc Forecast (HistoryWindow) returns (ForecastResult);
+}
+
+message Empty {}
+
+message Pulse {
+    int64 timestamp = 1;
+    string organ = 2; // "REFLEX"
+}
+
+message PulseAck {
+    bool alive = 1;
+    int64 timestamp = 2;
+}
+
+message RegimeEvent {
+    string regime = 1; // "HIGH_VOL", "TRENDING", "RANGING"
+    double volatility = 2;
+    double liquidity = 3;
 }
 
 message StateVector {
-  double timestamp = 1;
-  double price = 2;
-  double velocity = 3;
-  double jerk = 4;
-  double entropy = 5;
-  double efficiency_index = 6; // Work / Energy
+    double price = 1;
+    double velocity = 2;
+    double vol_cluster = 3;
 }
 
 message StrategyIntent {
-  string regime = 1; // "RIEMANN" or "SHANNON"
-  double conviction = 2; // 0.0 to 1.0
-  double risk_scalar = 3; // Multiplier for position sizing
-  bool halt_trading = 4; // Kill switch
+    string action = 1; // "BUY", "SELL", "HOLD"
+    double confidence = 2;
+    string model_used = 3;
+}
+
+message HistoryWindow {
+    repeated double prices = 1;
+    repeated double volumes = 2;
+    int32 window_size = 3;
+}
+
+message ForecastResult {
+    double p10 = 1;
+    double p50 = 2;
+    double p90 = 3;
+    double horizon = 4;
 }

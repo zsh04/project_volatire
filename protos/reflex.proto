@@ -1,0 +1,43 @@
+syntax = "proto3";
+package reflex;
+
+service ReflexService {
+  // 1. The Ratchet: Force a risk level change (e.g., from UI or Brain Emergency)
+  rpc TriggerRatchet (RatchetRequest) returns (Ack);
+
+  // 2. The Configuration: Update parameters (from Legislature/Brain)
+  rpc UpdateConfig (ConfigPayload) returns (Ack);
+
+  // 3. The Status: Get current health/physics state (for UI)
+  rpc GetStream (Empty) returns (stream Heartbeat);
+}
+
+message RatchetRequest {
+  enum Level {
+    IDLE = 0;
+    TIGHTEN = 1; // Reduce size
+    FREEZE = 2;  // Cancel all, hold cash
+    KILL = 3;    // Liquidate everything, shutdown
+  }
+  Level level = 1;
+  string reason = 2;
+}
+
+message ConfigPayload {
+  string key = 1;   // e.g., "esn_spectral_radius"
+  double value = 2;
+}
+
+message Heartbeat {
+  double timestamp = 1;
+  bool brain_connected = 2;
+  double efficiency_index = 3;
+  double p_riemann = 4; // Current probability of trend
+}
+
+message Ack {
+  bool success = 1;
+  string message = 2;
+}
+
+message Empty {}
