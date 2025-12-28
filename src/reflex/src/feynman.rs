@@ -62,12 +62,11 @@ impl PhysicsEngine {
     }
 
     pub fn update(&mut self, price: f64, timestamp: f64) -> PhysicsState {
-        // 1. Calculate Time Delta
-        let dt = timestamp - self.prev_state.timestamp;
+        // 1. Calculate Time Step for Instantaneous Acceleration/Jerk
+        let dt_step = timestamp - self.prev_state.timestamp;
         
         // Guard: Zero Time Delta (Microsecond collision)
-        if dt <= 0.0 && self.count > 0 {
-            // Return previous state with new price to avoid DivByZero
+        if dt_step <= 0.0 && self.count > 0 {
             let mut safe_state = self.prev_state;
             safe_state.price = price; 
             return safe_state;
@@ -80,6 +79,7 @@ impl PhysicsEngine {
         self.history.push_back((timestamp, price));
 
         // 3. Welford's Algorithm (Volatility)
+        // Note: Welford tracks volatility of "step returns", not windowed returns.
         let return_val = if self.prev_state.price != 0.0 {
             (price - self.prev_state.price) / self.prev_state.price
         } else {
@@ -99,10 +99,31 @@ impl PhysicsEngine {
         };
         let volatility = variance.sqrt();
 
-        // 4. Derivatives (Finite Difference)
-        let velocity = if dt > 0.0 { (price - self.prev_state.price) / dt } else { 0.0 };
-        let acceleration = if dt > 0.0 { (velocity - self.prev_state.velocity) / dt } else { 0.0 };
-        let jerk = if dt > 0.0 { (acceleration - self.prev_state.acceleration) / dt } else { 0.0 };
+        // 4. Derivatives (Windowed Velocity)
+        // Find price ~100ms ago for velocity calculation to smooth noise
+        let window_lookback = 100.0; // ms
+        let (past_ts, past_price) = self.find_tick_at(timestamp - window_lookback);
+        
+        let dt_window = timestamp - past_ts;
+        let velocity = if dt_window > f64::EPSILON {
+            (price - past_price) / dt_window
+        } else {
+            0.0
+        };
+
+        // Acceleration and Jerk are "Instantaneous changes in the Windowed Vector"
+        // a = dv/dt (where dt is the step time, not window time)
+        let acceleration = if dt_step > f64::EPSILON {
+            (velocity - self.prev_state.velocity) / dt_step
+        } else {
+            0.0
+        };
+
+        let jerk = if dt_step > f64::EPSILON {
+            (acceleration - self.prev_state.acceleration) / dt_step
+        } else {
+            0.0
+        };
 
         // 5. Entropy (Shannon)
         let entropy = self.calculate_entropy();
@@ -123,6 +144,27 @@ impl PhysicsEngine {
 
         self.prev_state = new_state;
         new_state
+    }
+
+    // Helper: Find a tick closest to target_ts in history
+    fn find_tick_at(&self, target_ts: f64) -> (f64, f64) {
+        if self.history.is_empty() {
+            return (0.0, 0.0);
+        }
+        
+        // Scan backwards. Since history is sorted, we stop when we go past target.
+        // Actually, we want the tick *closest* to target_ts or the first one *before* it?
+        // Let's take the first one <= target_ts, or just the oldest if none exist.
+        
+        for (ts, price) in self.history.iter().rev() {
+            if *ts <= target_ts {
+                return (*ts, *price);
+            }
+        }
+        
+        // If we didn't find any tick older than target (i.e., history is shorter than window),
+        // return the oldest tick available.
+        self.history.front().copied().unwrap_or((0.0, 0.0))
     }
 
     fn calculate_entropy(&self) -> f64 {
@@ -213,20 +255,22 @@ mod tests {
         let s0 = engine.update(0.0, 0.0);
         assert_eq!(s0.velocity, 0.0);
 
-        // t=1, p=1 (v=1, a=0)
-        let s1 = engine.update(1.0, 1.0);
+        // t=100, p=100 (v = (100-0)/(100-0) = 1.0)
+        let s1 = engine.update(100.0, 100.0);
         assert_eq!(s1.velocity, 1.0);
-        assert_eq!(s1.acceleration, 1.0); // First step accl is 1.0
-
-        // t=2, p=2 (v=1, a=0)
-        let s2 = engine.update(2.0, 2.0);
-        assert_eq!(s2.velocity, 1.0);
-        assert_eq!(s2.acceleration, 0.0); 
-        assert_eq!(s2.jerk, -1.0); 
         
-        // t=3, p=3 (v=1, a=0, j=0)
-        let s3 = engine.update(3.0, 3.0);
-        assert_eq!(s3.jerk, 0.0); 
+        // a = (v1 - v0) / (t1 - t0) = (1.0 - 0.0) / 100.0 = 0.01
+        assert!((s1.acceleration - 0.01).abs() < 1e-6); 
+
+        // t=200, p=200 (v = (200-100)/(200-100) = 1.0)
+        let s2 = engine.update(200.0, 200.0);
+        assert_eq!(s2.velocity, 1.0);
+        
+        // a = (1.0 - 1.0) / 100 = 0.0
+        assert_eq!(s2.acceleration, 0.0); 
+        
+        // j = (0.0 - 0.01) / 100 = -0.0001
+        assert!((s2.jerk - -0.0001).abs() < 1e-6); 
     }
 
     #[test]
@@ -238,10 +282,16 @@ mod tests {
         engine.update(100.0, 2.0); // v=0
 
         // Sudden Spike
+        // With windowed logic (lookback 100ms), we find the tick at t=0 (price 100).
+        // dt_window = 3.0 - 0.0 = 3.0
+        // v = (110 - 100) / 3.0 = 3.333...
+        // a = (3.333 - 0) / 1.0 = 3.333...
+        // j = (3.333 - 0) / 1.0 = 3.333...
+        
         let s = engine.update(110.0, 3.0);
-        assert_eq!(s.velocity, 10.0);
-        assert_eq!(s.acceleration, 10.0);
-        assert_eq!(s.jerk, 10.0);
+        assert!((s.velocity - 3.3333333).abs() < 1e-5);
+        assert!((s.acceleration - 3.3333333).abs() < 1e-5);
+        assert!((s.jerk - 3.3333333).abs() < 1e-5);
     }
 
     #[test]

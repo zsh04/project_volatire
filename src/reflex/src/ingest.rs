@@ -30,25 +30,21 @@ pub async fn connect(symbol: &str, tx: mpsc::Sender<Tick>) {
 async fn connect_loop(url: &Url, tx: &mpsc::Sender<Tick>) -> Result<(), Box<dyn std::error::Error>> {
     let (ws_stream, _) = connect_async(url).await?;
     info!("Ingest: Connected to Binance Stream.");
-
-    let (_, mut read) = ws_stream.split();
-
+    let (_write, mut read) = ws_stream.split();
+    
+    // Subscribe (Binance doesn't need explicit subscribe for single stream URL)
+    
     while let Some(msg) = read.next().await {
         let msg = msg?;
-        
+
         match msg {
             Message::Text(text) => {
-                // PERFORMANCE: In Phase 2, avoid String allocation here. Use zero-copy parsing (e.g., simd-json)
-                // or parse directly from the bytes. For now (Phase 1), serde_json::from_str is acceptable.
                 if let Ok(event) = serde_json::from_str::<BinanceTradeEvent>(&text) {
                     if let Some(tick) = event.to_tick() {
                         if let Err(e) = tx.send(tick).await {
-                             // If channel is closed, main loop is dead. Exit.
                              return Err(format!("Channel closed: {}", e).into());
                         }
                     }
-                } else {
-                    warn!("Ingest: Failed to parse message: {}", text);
                 }
             }
             Message::Ping(_) | Message::Pong(_) => {}
