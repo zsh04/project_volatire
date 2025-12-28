@@ -16,6 +16,8 @@ pub mod brain_proto {
 pub mod feynman;
 pub mod market;
 pub mod ingest;
+pub mod ledger;
+pub mod taleb;
 mod server;
 
 #[tokio::main]
@@ -30,7 +32,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // 3. Reflex Core Init
     let mut physics = feynman::PhysicsEngine::new(2000); // 2000 tick capacity
+    let mut _ledger = ledger::AccountState::new(0.0, 0.0); // Shadow Ledger (Empty init)
+    let _risk = taleb::RiskGuardian::new(); // Taleb
     
+    info!("🛡️ Taleb Risk Engine: ARMED");
+
     // 4. Ingest (Eyes)
     let (tx, mut rx) = tokio::sync::mpsc::channel(100);
     // Connect to Binance.com (Directive-07 Requirement)
