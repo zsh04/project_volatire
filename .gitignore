@@ -1,0 +1,15 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv
+.env
+
+# Rust
+target/
+**/*.rs.bk
+
+# Project V Specific
+docs/internal/
+*.log
+data/
+.DS_Store

@@ -1,0 +1,23 @@
+services:
+  dragonfly:
+    image: 'docker.dragonflydb.io/dragonflydb/dragonfly'
+    ulimits:
+      memlock: -1
+    ports:
+      - "6379:6379"
+    command: --default_lua_flags=allow-undeclared-keys
+    volumes:
+      - dragonfly_data:/data
+
+  questdb:
+    image: 'questdb/questdb'
+    ports:
+      - "9000:9000"
+      - "9009:9009"
+      - "8812:8812"
+    volumes:
+      - questdb_data:/var/lib/questdb
+
+volumes:
+  dragonfly_data:
+  questdb_data:

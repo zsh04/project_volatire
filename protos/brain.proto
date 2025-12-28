@@ -1,0 +1,24 @@
+syntax = "proto3";
+package brain;
+
+// The Strategy Service (Python)
+service BrainService {
+  // Reflex sends State, Brain returns Strategy
+  rpc Pulse (StateVector) returns (StrategyIntent);
+}
+
+message StateVector {
+  double timestamp = 1;
+  double price = 2;
+  double velocity = 3;
+  double jerk = 4;
+  double entropy = 5;
+  double efficiency_index = 6; // Work / Energy
+}
+
+message StrategyIntent {
+  string regime = 1; // "RIEMANN" or "SHANNON"
+  double conviction = 2; // 0.0 to 1.0
+  double risk_scalar = 3; // Multiplier for position sizing
+  bool halt_trading = 4; // Kill switch
+}
