@@ -1,0 +1,50 @@
+syntax = "proto3";
+
+package macro;
+
+// Economic Regime classification derived from GDP and PCE data (Source: BEA).
+// Used to bias risk parameters (e.g., lower leverage in CONTRACTION).
+enum RegimeBias {
+  EXPANSION = 0;
+  CONTRACTION = 1;
+  STAGFLATION = 2;
+  UNCERTAIN = 3;
+}
+
+// Represents the global economic state ("Economic Gravity").
+// Used by Taleb to calculate the dynamic Hurdle Rate.
+message MacroState {
+  // Frederick Fed Funds Effective Rate (Daily).
+  // Source: FRED API (Series: FEDFUNDS)
+  double risk_free_rate = 1;
+
+  // St. Louis Fed Financial Stress Index.
+  // Source: St. Louis Fed (Series: STLFSI4)
+  // Values > 0 indicate above-average financial market stress.
+  double systemic_stress = 2;
+
+  // Aggregated Economic Sentiment Score (-1.0 to 1.0).
+  // Source: Tiingo / AlphaVantage News Sentiment.
+  double economic_sentiment = 3;
+
+  // The broader economic cycle classification.
+  // Source: Computed from BEA GDP/PCE.
+  RegimeBias regime_bias = 4;
+}
+
+// Request to update the macro state in the Reflex engine.
+message SyncMacroRequest {
+  MacroState state = 1;
+}
+
+// Response acknowledging the macro state update.
+message SyncMacroResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// The Synapse service for Macro-economic data transmission.
+service MacroSynapse {
+  // Unary RPC to sync the latest macro state from Brain (Python) to Reflex (Rust).
+  rpc SyncMacroState (SyncMacroRequest) returns (SyncMacroResponse);
+}

@@ -1,4 +1,7 @@
 pyproject.toml
+app/__init__.py
+app/main.py
+app/generated/__init__.py
 brain.egg-info/PKG-INFO
 brain.egg-info/SOURCES.txt
 brain.egg-info/dependency_links.txt

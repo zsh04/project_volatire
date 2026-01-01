@@ -1,45 +1,31 @@
-[project]
+[tool.poetry]
 name = "brain"
 version = "0.1.0"
-description = "The Cognitive Engine of Project V"
-requires-python = ">=3.12"
-dependencies = [
-    # The Nervous System
-    "grpcio>=1.60.0",
-    "grpcio-tools>=1.60.0",
-    "protobuf>=4.25.0",
+description = "The Mind of Voltaire (Python)"
+authors = ["Antigravity <ai@voltaire.com>"]
 
-    # The Logic
-    "pydantic>=2.5.0",
-    "pydantic-settings>=2.1.0",
-    "pydantic-ai>=0.0.1",
+[tool.poetry.dependencies]
+python = "^3.12"
+grpcio = "^1.50.0"
+protobuf = "^4.21.0"
+rich = "^13.0.0"
+pandas = "^2.2.0"
+numpy = "^1.24.0"
+alpaca-py = "^0.14.0"
+questdb = "^1.0.0"
+grpcio-tools = "^1.50.0"
+pandas-datareader = "^0.10.0"
+requests = "^2.28.0"
+torch = "^2.2.0"
+# "autogluon.timeseries" = "*"
+chronos-forecasting = {git = "https://github.com/amazon-science/chronos-forecasting.git"}
+huggingface_hub = "^0.23.0"
+feedparser = "^6.0.10"
+onnxruntime = "^1.16.0"
+transformers = "^4.41.0"
+python-dotenv = "^1.0.0"
+optimum = {extras = ["onnxruntime"], version = "^1.16.0"}
 
-    # The Forecaster (Kepler)
-    "torch>=2.1.0",
-    "transformers>=4.36.0",
-    
-    # The Context (Hypatia)
-    "lancedb>=0.4.0",
-    "sentence-transformers>=2.2.0",
-
-    # Data & Utilities
-    "polars>=0.20.0",
-    "numpy>=1.26.0",
-    "python-dotenv>=1.0.0",
-    "structlog>=23.2.0"
-]
-
-# New Standard for uv dev dependencies
-[dependency-groups]
-dev = [
-    "ruff>=0.1.0",
-    "mypy>=1.7.0"
-]
-
-[tool.mypy]
-strict = true
-ignore_missing_imports = true
-
-[tool.ruff]
-line-length = 100
-target-version = "py312"
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

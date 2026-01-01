@@ -1,0 +1,64 @@
+name: Voltaire CI
+
+on:
+  push:
+    branches: [ "main", "feature/*" ]
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  CARGO_TERM_COLOR: always
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  brain-test:
+    name: Brain (Python) Tests
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./src/brain
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Python ${{ env.PYTHON_VERSION }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+
+    - name: Install Dependencies
+      run: |
+        poetry install --no-interaction --no-root
+
+    - name: Run Unit Tests
+      run: |
+        # Skip integration tests that require live environment
+        poetry run python -m unittest discover -s tests -p "test_*.py"
+
+  reflex-test:
+    name: Reflex (Rust) Tests
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./src/reflex
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
+
+    - name: Build
+      run: cargo build --verbose
+
+    - name: Run Tests
+      run: cargo test --verbose
