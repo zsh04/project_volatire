@@ -10,13 +10,15 @@ tonic = "0.10"
 prost = "0.12"
 
 # The Physics Engine (Math)
-ndarray = "0.15" # O(1) Matrix operations
+# The Physics Engine (Math)
+ndarray = "0.15"
 ndarray-rand = "0.14"
 rand = "0.8"
-nalgebra = "0.32" # Linear Algebra
+prost-types = "0.12"
+nalgebra = "0.32" 
 statrs = "0.16"
 ringbuf = "0.3"
-itertools = "0.12"   # Statistical distributions
+itertools = "0.12"
 tokio-stream = "0.1"
 futures-util = "0.3"
 tokio-tungstenite = { version = "0.20", features = ["native-tls"] }
@@ -33,9 +35,25 @@ config = "0.13"
 dotenvy = "0.15"
 tracing = "0.1"
 tracing-subscriber = "0.3"
+questdb-rs = "6.1.0"
+tokio-postgres = "0.7.15"
+deadpool-postgres = "0.14.1"
+
+# Cryptography (Auth)
+hmac = "0.12"
+sha2 = "0.10"
+base64 = "0.22"
+hex = "0.4"
+uuid = { version = "1.0", features = ["v4"] }
+
+# The Archiver (Deep Memory)
+parquet = { version = "53.0", features = ["async"] }
+arrow = "53.0"
+object_store = { version = "0.11", features = ["aws"] }
+futures = "0.3" # Added for stream manipulation
 
 [build-dependencies]
-tonic-build = "0.10" # Compiles .proto to .rs
+tonic-build = "0.10"
 
 [[bin]]
 name = "reflex"

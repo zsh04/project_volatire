@@ -13,3 +13,4 @@ docs/internal/
 *.log
 data/
 .DS_Store
+src/brain/models/**/*.onnx

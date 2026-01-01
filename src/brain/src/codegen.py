@@ -19,7 +19,7 @@ def generate_protos():
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
 
-    protos = ["brain.proto", "reflex.proto"]
+    protos = ["brain.proto", "reflex.proto", "macro.proto"]
 
     for proto in protos:
         proto_path = os.path.join(proto_dir, proto)

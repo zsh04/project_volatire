@@ -13,7 +13,6 @@ pub struct Tick {
 // ==============================================================================
 // 2. Binance Incoming Message (JSON)
 // ==============================================================================
-// Reference: {"e": "trade", "E": 123456789, "s": "BTCUSDT", "p": "0.001", "q": "100", "T": 123456785}
 #[derive(Debug, Deserialize)]
 pub struct BinanceTradeEvent {
     #[serde(rename = "e")]
@@ -26,7 +25,7 @@ pub struct BinanceTradeEvent {
     pub symbol: String,
     
     #[serde(rename = "p")]
-    pub price: String, // Prices come as strings to preserve precision
+    pub price: String, 
     
     #[serde(rename = "q")]
     pub quantity: String,
@@ -45,5 +44,22 @@ impl BinanceTradeEvent {
             price,
             quantity,
         })
+    }
+}
+
+// ==============================================================================
+// 3. Market State (Aggregation)
+// ==============================================================================
+pub struct MarketData {
+    pub price: f64,
+}
+
+impl MarketData {
+    pub fn new() -> Self {
+        Self { price: 0.0 }
+    }
+    
+    pub fn update_price(&mut self, price: f64) {
+        self.price = price;
     }
 }

@@ -36,6 +36,14 @@ message RegimeEvent {
     double liquidity = 3;
 }
 
+message MacroState {
+  double risk_free_rate = 1;  // DGS10 or FEDFUNDS
+  double inflation_rate = 2;  // PCE or CPI
+  double stress_index = 3;    // STLFSI4
+  double sentiment_score = 4; // News Sentiment (-1.0 to 1.0)
+  double hurdle_rate = 5;     // The Calculated MAR
+}
+
 message StateVector {
     double price = 1;
     double velocity = 2;
@@ -48,6 +56,16 @@ message StrategyIntent {
     string action = 1; // "BUY", "SELL", "HOLD"
     double confidence = 2;
     string model_used = 3;
+    // Taleb Extensions
+    double forecast_p10 = 4;
+    double forecast_p50 = 5;
+    double forecast_p90 = 6;
+    int64 forecast_timestamp = 7; // Unix Milliseconds
+    double forecast_p20 = 8;
+    double forecast_p80 = 9;
+    // Macro Gravity
+    double hurdle_rate = 10;
+    MacroState macro_context = 11;
 }
 
 message HistoryWindow {
