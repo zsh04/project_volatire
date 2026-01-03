@@ -1,8 +1,10 @@
-use crate::governor::ooda_loop::PhysicsState;
+use crate::feynman::PhysicsState;
 use std::collections::VecDeque;
 
 // Safety Staircase Tiers for Risk (Lots)
+// Safety Staircase Tiers for Risk (Lots)
 const SAFETY_STAIRCASE: [f64; 6] = [0.01, 0.05, 0.10, 0.25, 0.50, 1.0];
+const WARMUP_DURATION_MS: u128 = 300_000; // 5 Minutes
 
 #[derive(Debug, Clone)]
 pub struct ProvisionalExecutive {
@@ -10,6 +12,7 @@ pub struct ProvisionalExecutive {
     pub consecutive_stable_cycles: usize,
     pub required_stable_cycles: usize,
     pub shadow_pnl_window: VecDeque<f64>, // Rolling PnL of shadow sim
+    pub boot_time: std::time::Instant,
 }
 
 impl ProvisionalExecutive {
@@ -19,6 +22,7 @@ impl ProvisionalExecutive {
             consecutive_stable_cycles: 0,
             required_stable_cycles: 2, // As per directive
             shadow_pnl_window: VecDeque::with_capacity(1000),
+            boot_time: std::time::Instant::now(),
         }
     }
 
@@ -94,6 +98,12 @@ impl ProvisionalExecutive {
             return false;
         }
 
+        // 1.5 Warm-up Check (Sandbox Verification)
+        if self.boot_time.elapsed().as_millis() < WARMUP_DURATION_MS {
+            // Log once per minute? implicit logic prevents spamming
+            return false; // Still warming up
+        }
+
         // 2. Check Shadow Consistency (Omega > 1 => Sum PnL > 0)
         let total_pnl: f64 = self.shadow_pnl_window.iter().sum();
         if total_pnl <= 0.0 {
@@ -119,17 +129,19 @@ mod tests {
     fn test_safety_staircase_climb() {
         let mut exec = ProvisionalExecutive::new();
         
+        // Override boot_time to bypass warm-up for testing
+        exec.boot_time = std::time::Instant::now() - std::time::Duration::from_secs(400);
+        
         // Initial State
         assert_eq!(exec.get_current_max_risk(), 0.01);
 
         // Mock Stable Physics
         let stable_physics = PhysicsState {
-            symbol: "BTC".to_string(),
             price: 100.0,
             velocity: 0.0,
             acceleration: 0.0,
             jerk: 0.001, // Very low jerk
-            basis: 0.0,
+            ..Default::default()
         };
 
         // Cycle 1: Stable
@@ -149,12 +161,11 @@ mod tests {
         exec.update_shadow_sim(-1000.0); 
 
          let stable_physics = PhysicsState {
-            symbol: "BTC".to_string(),
             price: 100.0,
             velocity: 0.0,
             acceleration: 0.0,
             jerk: 0.001,
-            basis: 0.0,
+            ..Default::default()
         };
 
         // Run cycles
@@ -174,15 +185,36 @@ mod tests {
 
          // Chaos Physics
          let chaos = PhysicsState {
-            symbol: "BTC".to_string(),
             price: 100.0,
             velocity: 100.0,
             acceleration: 50.0,
             jerk: 5.0, // Massive Jerk
-            basis: 0.0,
+            ..Default::default()
         };
 
         exec.update(&chaos, 5.0, 0.1); // High Entropy, Low Efficiency
         assert_eq!(exec.get_current_max_risk(), 0.01, "Should drop to 0.01");
+    }
+
+    #[test]
+    fn test_warmup_lockout() {
+        let mut exec = ProvisionalExecutive::new();
+        
+        // Mock Stable Physics
+        let stable_physics = PhysicsState {
+            price: 100.0,
+            velocity: 0.0,
+            acceleration: 0.0,
+            jerk: 0.001,
+            ..Default::default()
+        };
+
+        // Run enough cycles to trigger promotion (but should fail due to warmup)
+        exec.update(&stable_physics, 0.5, 0.95);
+        let promoted = exec.update(&stable_physics, 0.5, 0.95);
+        
+        // Should not promote during warmup (even with stable conditions)
+        assert!(!promoted, "Should NOT promote during 5-min warmup");
+        assert_eq!(exec.get_current_max_risk(), 0.01);
     }
 }

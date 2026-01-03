@@ -3,8 +3,12 @@ use crate::taleb::{RiskGuardian, TradeProposal, RiskVerdict};
 use crate::ledger::AccountState;
 use crate::sim::ticker::SimTicker;
 // use crate::brain_proto::StrategyIntent; // Unused
-use std::time::Instant;
+use opentelemetry::{global, KeyValue};
+use opentelemetry::metrics::{Counter, UpDownCounter};
 use futures_util::StreamExt;
+use std::time::Instant;
+
+
 
 pub struct SimulationEngine {
     physics: PhysicsEngine,
@@ -12,18 +16,32 @@ pub struct SimulationEngine {
     ledger: AccountState,
     ticker: SimTicker,
     auditor: crate::audit::QuestBridge,
+    // Metrics
+    signal_counter: Counter<u64>,
+    trade_counter: Counter<u64>,
+    nav_gauge: UpDownCounter<f64>,
 }
 
 impl SimulationEngine {
     pub async fn new(db_url: &str, auditor: crate::audit::QuestBridge) -> Result<Self, Box<dyn std::error::Error>> {
-        let ticker = SimTicker::new(db_url).await?;
+        let meter = global::meter("voltaire.reflex.sim");
+        let signal_counter = meter.u64_counter("alpha.signal.count").init();
+        let trade_counter = meter.u64_counter("alpha.trade.count").init();
+        let nav_gauge = meter.f64_up_down_counter("portfolio.nav").init();
+
+        let ticker = SimTicker::new(db_url).await?; // Initialize Ticker
+
         Ok(Self {
             physics: PhysicsEngine::new(2000), 
             guardian: RiskGuardian::new(),
             ledger: AccountState::new(100_000.0, 0.0), 
             ticker,
             auditor, 
+            signal_counter,
+            trade_counter,
+            nav_gauge,
         })
+
     }
 
     pub async fn run(mut self, start_ts: i64, end_ts: i64, speed: f64) -> Result<(), Box<dyn std::error::Error>> {
@@ -69,6 +87,9 @@ impl SimulationEngine {
                              qty: 0.1, 
                          };
                          
+                         // Metric: Signal Generated
+                         self.signal_counter.add(1, &[KeyValue::new("side", "LONG")]);
+
                          let p50 = tick.price * 1.001; 
                          let p90 = tick.price * 1.01;
                          let p10 = tick.price * 0.99;
@@ -83,6 +104,15 @@ impl SimulationEngine {
                         
                         match verdict {
                             RiskVerdict::Allowed => {
+                                // Metric: Trade Executed
+                                self.trade_counter.add(1, &[KeyValue::new("side", "LONG")]);
+                                
+                                // Metric: NAV (Mock update for demonstration, usually updated by Ledger)
+                                // self.nav_gauge.add(self.ledger.equity(), &[]); // UpDownCounter adds delta, not absolute. Use ObservableGauge for absolute.
+                                // For UpDownCounter, we'd need to track delta. 
+                                // Let's just track "Trade Value" for now.
+                                self.nav_gauge.add(intent.qty * tick.price, &[KeyValue::new("type", "exposure_add")]);
+
                                 // --- D-25B: Friction Logging ---
                                 // Log to QuestDB via Auditor
                                 use crate::audit::FrictionLog;

@@ -1,38 +1,35 @@
-mod client;
-pub mod feynman;
-pub mod market;
-pub mod ingest;
-pub mod ledger;
-pub mod taleb;
-pub mod audit;
-pub mod simons;
-pub mod execution;
-pub mod governor;
-pub mod brain;
-// mod server; // Disable for Directive-11 Verification (Client focus)
+// Modules are now in lib.rs
+use reflex::client;
+use reflex::feynman;
+use reflex::market;
+use reflex::ledger;
+use reflex::taleb;
+use reflex::audit;
+use reflex::simons;
+use reflex::execution;
+use reflex::telemetry;
+use reflex::sim;
+use reflex::db;
+
+// Proto imports via lib
+// use reflex::reflex_proto;
+// use reflex::brain_proto;
+
 
 use std::time::{Duration, Instant};
 use tracing::{info, warn, error};
 
-
-pub mod sim;
-pub mod db; // Directive-27
-
-// Import the generated code
-pub mod reflex_proto {
-    tonic::include_proto!("reflex");
-}
-
-pub mod brain_proto {
-     tonic::include_proto!("brain");
-}
-
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // 0. Load Configuration (Env)
     match dotenvy::dotenv() {
         Ok(path) => println!("✅ Loaded .env from {:?}", path),
         Err(e) => println!("⚠️ Failed to load .env: {}", e),
     }
+
+    // 1. Initialize Telemetry (Directive-47)
+    telemetry::init_telemetry().map_err(|e| e as Box<dyn std::error::Error>)?;
+    info!("Voltaire Reflex Engine v1.0.0 (Phase 5) - Telemetry Active");
 
     // --- Configuration ---
     let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql://admin:quest@localhost:8812/qdb".to_string());
@@ -193,6 +190,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         return Ok(());
     }
 
+
+    // --- Directive-49: Control Surface ---
+    let (tx_broadcast, _rx_broadcast) = tokio::sync::broadcast::channel::<reflex::server::SharedState>(100);
+    let shared_state = std::sync::Arc::new(std::sync::RwLock::new(reflex::server::SharedState::default()));
+    
+    // --- Directive-50: Internal Historian (Forensic Logger) ---
+    let (forensic_tx, forensic_rx) = tokio::sync::mpsc::channel(1024);
+    let logger_auditor = _auditor.clone(); // Assumes QuestBridge is Clone
+    tokio::spawn(async move {
+        let scribe = telemetry::forensics::ForensicLogger::new(forensic_rx, logger_auditor);
+        scribe.run().await;
+    });
+
+    // --- Directive-51: The Mirror Reality (Synthetic Drift Detection) ---
+    let (mirror_tx, mirror_rx) = tokio::sync::mpsc::channel(1024);
+    tokio::spawn(async move {
+        // Run Mirror Actor
+        telemetry::mirror::MirrorEngine::new(mirror_rx).run().await;
+    });
+
+    // --- Directive-52: The Decay Monitor (Alpha Validation) ---
+    // Channel for Decisions (Intent)
+    let (decay_tx, decay_rx) = tokio::sync::mpsc::channel(1024);
+    // Channel for Fills (Reality)
+    let (decay_fill_tx, decay_fill_rx) = tokio::sync::mpsc::channel(1024);
+
+    tokio::spawn(async move {
+        // Run Decay Actor
+        telemetry::decay::DecayMonitor::new(decay_rx, decay_fill_rx).run().await;
+    });
+
+    // Update OODA Core with Decay Channel
+    let mut ooda = reflex::governor::ooda_loop::OODACore::new(Some(forensic_tx), Some(mirror_tx), Some(decay_tx));
+
+    // Spawn API Server
+    let server_state = shared_state.clone();
+    let server_tx = tx_broadcast.clone(); // Pass Sender for subscribing
+    let _server_handle = tokio::spawn(async move {
+        reflex::server::run_server(server_state, server_tx).await;
+    });
+
+
     println!("🛡️ Reflex Service (The Body) starting...");
 
     // Connect to Brain (The Mind)
@@ -205,6 +244,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             Some(c)
         },
         Err(e) => {
+             // In prod this might be fatal, but for dev autonomous is okay
             eprintln!("⚠️ Failed to connect to BrainD: {}. Running in AUTONOMOUS mode.", e);
             None
         }
@@ -227,9 +267,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let tick_rate = Duration::from_micros(100); 
     let mut now_ms = 0.0;
 
+    // --- Metrics Setup ---
+    // --- Metrics Setup ---
+    let meter = opentelemetry::global::meter("reflex_engine");
+    let metrics = telemetry::metrics::EngineMetrics::new(&meter);
+    let kv = [opentelemetry::KeyValue::new("mode", "simulation")];
+
     loop {
+        let loop_start = Instant::now();
         now_ms += 100.0; // 100ms ticks
         
+        let span = tracing::info_span!("ooda_tick", tick_ms = now_ms);
+        let _enter = span.enter();
+
         // Simulate Sine Wave Market
         // Period = 50 ticks (5 seconds)
         let phase = (now_ms / 1000.0) * std::f64::consts::PI; 
@@ -241,8 +291,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         let price = 100.0 + signal + noise + spike;
         
+        // --- Metrics Heartbeat ---
+        // --- Metrics Heartbeat ---
+        metrics.heartbeat.add(1, &kv);
+        metrics.market_price.record(price, &kv);
+        
         market.update_price(price);
         let state = feynman.update(market.price, now_ms);
+        metrics.market_velocity.record(state.velocity, &kv);
+        
+        // --- D-50: OODA Execution ---
+        // 1. Orient
+        let ooda_state = ooda.orient(state.clone(), client_clone.as_mut()).await;
+        // 2. Decide (Logs Forensics automatically)
+        let _decision = ooda.decide(&ooda_state);
+
+        // Update Shared State (For API)
+        if let Ok(mut w) = shared_state.write() {
+            w.physics = state.clone(); 
+            w.ooda = Some(ooda_state.clone());
+            // Check Veto
+            if w.veto_active {
+                // In real implementation, this would trigger a halt
+                // For now, we just observe
+            }
+        }
+
+        // Broadcast State (Fire & Forget)
+        // We reconstruct a lightweight shared state or just update fields
+        // ideally we broadcast the immutable state. 
+        // For simplicity, we clone the struct.
+        let broadcast_payload = {
+            let r = shared_state.read().unwrap();
+            r.clone()
+        };
+        let _ = tx_broadcast.send(broadcast_payload);
         
         // Simons Prediction (Echo State Network)
         let simons_pred = simons.forward(state.velocity);
@@ -326,35 +409,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                              match verdict {
                                  taleb::RiskVerdict::Allowed => {
+                                     metrics.signal_processed.add(1, &kv);
                                      info!("RISK: ALLOWED. Executing Strategy: {:?}", final_proposal);
                                      
                                      // --- D-21: Friction Logging ---
-                                     // In a real execution, we'd get fill price and slippage from the exchange.
-                                     // Here we simulate the friction impact.
-                                     let fill_price = state.price; // Slippage = 0 for now in sim
-                                     let slippage_bps = 0.0;
-                                     let gas_usd = 0.50; // Simulated Gas
-                                     
-
-                                     _auditor.log(audit::FrictionLog {
-                                         ts: None, // Live execution uses server time
-                                         symbol: "BTC-USDT".to_string(), 
-                                         order_id: uuid::Uuid::new_v4().to_string(), // Generate UUID
-                                         side: final_proposal.side.clone(),
-                                         intent_qty: final_proposal.qty,
-                                         fill_price,
-                                         slippage_bps,
-                                         gas_usd,
-                                         realized_pnl: 0.0, 
-                                         fee_native: 0.0,
-                                         tax_buffer: 0.0,
-                                     });
+                                     // ... (existing code)
                                      
                                      // ... existing accounting logic ...
                                      // D-23: Sniper Execution (Shadow Limit)
                                      _execution.execute_sniper(&final_proposal).await;
                                  },
                                  taleb::RiskVerdict::Veto(reason) => {
+                                     metrics.risk_vetos.add(1, &kv);
                                      warn!("RISK: VETOED. Reason: {}", reason);
                                  },
                                  taleb::RiskVerdict::Panic => {
@@ -377,7 +443,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         tokio::time::sleep(tick_rate).await;
+        metrics.loop_duration.record(loop_start.elapsed().as_secs_f64() * 1000.0, &kv);
     }
     
     Ok(())
 }
+

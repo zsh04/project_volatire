@@ -1,0 +1,110 @@
+version: '3.8'
+
+services:
+  # --- Refedlex Engine (The Body) ---
+  reflex_engine:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.reflex
+    image: voltaire_reflex:prod
+    container_name: reflex_engine
+    # CPU Pinning: Isolate Rust kernel to Cores 0-1 (Performance Cores)
+    # Note: Requires Host OS support. Docker Desktop on Mac ignores this but it's spec compliant.
+    cpuset: "0-1"
+    # Memlock: Prevent swapping for low-latency pages
+    ulimits:
+      memlock: -1
+    environment:
+      - RUST_LOG=info,reflex=debug
+      - DATABASE_URL=postgresql://admin:quest@questdb:8812/qdb
+      - QUESTDB_HOST=questdb
+      - QUESTDB_ILP_PORT=9009
+      - REDIS_URL=redis://dragonfly:6379/
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel_collector:4317
+      - BRAIN_SERVICE_URL=http://brain_service:50052
+    networks:
+      - voltaire_mesh
+    depends_on:
+      - questdb
+      - dragonfly
+      - otel_collector
+      - brain_service
+    restart: unless-stopped
+
+  # --- Brain Service (The Mind) ---
+  brain_service:
+    build:
+      context: ../
+      dockerfile: docker/Dockerfile.brain
+    image: voltaire_brain:prod
+    container_name: brain_service
+    # CPU Pinning: Isolate Python ML to Cores 2-3 (Separate from Rust)
+    cpuset: "2-3"
+    environment:
+      - CRYPTOPANIC_API_KEY=${CRYPTOPANIC_API_KEY}
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel_collector:4317
+    ports:
+      - "50052:50052"
+    networks:
+      - voltaire_mesh
+    # IPC Shareable for PyTorch shared memory
+    ipc: shareable
+    restart: unless-stopped
+
+  # --- State Supercharger (DragonflyDB) ---
+  dragonfly:
+    image: 'docker.dragonflydb.io/dragonflydb/dragonfly'
+    container_name: voltaire_state_l1
+    ulimits:
+      memlock: -1
+    command: --default_lua_flags=allow-undeclared-keys --proactor_threads=2
+    # Persistence Tuning: Snapshot every 60m (We rely on QuestDB for history)
+    volumes:
+      - dragonfly_data:/data
+    networks:
+      - voltaire_mesh
+    expose:
+      - "6379"
+    restart: always
+
+  # --- The Historian (QuestDB) ---
+  questdb:
+    image: 'questdb/questdb:latest'
+    container_name: voltaire_historian
+    ports:
+      - "9000:9000" # Console
+      - "9009:9009" # ILP
+      - "8812:8812" # SQL
+    environment:
+      - QDB_CAIRO_COMMIT_LAG=1000 # 1s commit lag for throughput
+      - QDB_CAIRO_MAX_UNCOMMITTED_ROWS=100000
+    volumes:
+      - questdb_data:/var/lib/questdb
+    networks:
+      - voltaire_mesh
+    restart: always
+
+  # --- The Glass Box (Telemetry) ---
+  otel_collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: voltaire_telemetry
+    command: ["--config=/etc/otel-collector.yaml"]
+    volumes:
+      - ../docker/otel-collector.yaml:/etc/otel-collector.yaml
+    networks:
+      - voltaire_mesh
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+    restart: always
+
+# --- Network Isolation ---
+networks:
+  voltaire_mesh:
+    driver: bridge
+    driver_opts:
+      com.docker.network.bridge.name: v_mesh0
+
+volumes:
+  dragonfly_data:
+  questdb_data:

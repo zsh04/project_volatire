@@ -22,10 +22,30 @@ class BrainService(brain_pb2_grpc.BrainServiceServicer):
         self.kepler = KeplerOracle()
         self.boyd = BoydStrategist()
 
-        # Internal Memory (Short-term)
         self.price_history = deque(maxlen=100)
         self.timestamps = deque(maxlen=100)
 
+        # Telemetry Instruments
+        from opentelemetry import metrics
+
+        meter = metrics.get_meter("voltaire.brain")
+        self.inference_duration = meter.create_histogram(
+            name="brain_inference_duration",
+            description="Time taken for Brain Reason() logic",
+            unit="ms",
+        )
+        self.inference_confidence = meter.create_histogram(
+            name="brain_inference_confidence",
+            description="Confidence level of generated signals",
+        )
+        self.signals_generated = meter.create_counter(
+            name="brain_signals_generated",
+            description="Count of signals by action type",
+        )
+
+        from opentelemetry import trace
+
+        self.tracer = trace.get_tracer("voltaire.brain")
         logger.info("✨ CORTEX Online.")
 
     async def Reason(self, request, context):
@@ -33,9 +53,11 @@ class BrainService(brain_pb2_grpc.BrainServiceServicer):
         The Main Loop entry point.
         Reflex sends StateVector -> Brain returns StrategyIntent.
         """
-        # 1. Update Short-term Memory
-        self.price_history.append(request.price)
-        self.timestamps.append(datetime.now())
+        with self.tracer.start_as_current_span("brain_reason_loop"):
+            # 1. Update Short-term Memory
+            start_time = datetime.now()
+            self.price_history.append(request.price)
+            self.timestamps.append(start_time)
 
         # Log Stimulus (Rich)
         console.print(
@@ -123,6 +145,12 @@ class BrainService(brain_pb2_grpc.BrainServiceServicer):
         else:
             f_p10, f_p20, f_p50, f_p80, f_p90, f_ts = 0.0, 0.0, 0.0, 0.0, 0.0, 0
 
+        # Record Metrics
+        duration_ms = (datetime.now() - start_time).total_seconds() * 1000
+        self.inference_duration.record(duration_ms)
+        self.inference_confidence.record(decision.confidence)
+        self.signals_generated.add(1, {"action": decision.action})
+
         return brain_pb2.StrategyIntent(
             action=decision.action,
             confidence=decision.confidence,
@@ -145,3 +173,28 @@ class BrainService(brain_pb2_grpc.BrainServiceServicer):
     async def Forecast(self, request, context):
         # Allow direct forecast requests (bypass Boyd)
         return brain_pb2.ForecastResult(p50=0.0)
+
+    async def GetContext(self, request, context):
+        """
+        D-54: Live Semantic Context.
+        Combines Real-Time Sentiment (D-38) + Deep Memory (D-37).
+        """
+        start = datetime.now()
+
+        # Call Hypatia Engine
+        ctx_data = await self.hypatia.fetch_context(request.price, request.velocity)
+
+        duration_ns = int((datetime.now() - start).total_seconds() * 1e9)
+
+        console.print(
+            f"[bold yellow]🧠 CONTEXT:[/bold yellow] "
+            f"Regime: [cyan]{ctx_data['nearest_regime']}[/cyan] | "
+            f"Sent: [magenta]{ctx_data['sentiment_score']:.2f}[/magenta]"
+        )
+
+        return brain_pb2.ContextResponse(
+            sentiment_score=ctx_data["sentiment_score"],
+            nearest_regime=ctx_data["nearest_regime"],
+            regime_distance=ctx_data["regime_distance"],
+            computation_time_ns=duration_ns,
+        )

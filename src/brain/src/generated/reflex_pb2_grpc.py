@@ -34,6 +34,26 @@ class ReflexServiceStub(object):
         Args:
             channel: A grpc.Channel.
         """
+        self.GetPhysics = channel.unary_unary(
+                '/reflex.ReflexService/GetPhysics',
+                request_serializer=reflex__pb2.Empty.SerializeToString,
+                response_deserializer=reflex__pb2.PhysicsResponse.FromString,
+                _registered_method=True)
+        self.GetOODA = channel.unary_unary(
+                '/reflex.ReflexService/GetOODA',
+                request_serializer=reflex__pb2.Empty.SerializeToString,
+                response_deserializer=reflex__pb2.OODAResponse.FromString,
+                _registered_method=True)
+        self.TriggerVeto = channel.unary_unary(
+                '/reflex.ReflexService/TriggerVeto',
+                request_serializer=reflex__pb2.VetoRequest.SerializeToString,
+                response_deserializer=reflex__pb2.Ack.FromString,
+                _registered_method=True)
+        self.DemoteProvisional = channel.unary_unary(
+                '/reflex.ReflexService/DemoteProvisional',
+                request_serializer=reflex__pb2.DemoteRequest.SerializeToString,
+                response_deserializer=reflex__pb2.Ack.FromString,
+                _registered_method=True)
         self.TriggerRatchet = channel.unary_unary(
                 '/reflex.ReflexService/TriggerRatchet',
                 request_serializer=reflex__pb2.RatchetRequest.SerializeToString,
@@ -54,22 +74,52 @@ class ReflexServiceStub(object):
 class ReflexServiceServicer(object):
     """Missing associated documentation comment in .proto file."""
 
+    def GetPhysics(self, request, context):
+        """--- Control Plane ---
+        1. Get Physics State (Internal Mechanics)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetOODA(self, request, context):
+        """2. Get OODA State (Decision Logic)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def TriggerVeto(self, request, context):
+        """3. Trigger Veto (Nuclear Option)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DemoteProvisional(self, request, context):
+        """4. Demote Provisional (Safety Staircase)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def TriggerRatchet(self, request, context):
-        """1. The Ratchet: Force a risk level change (e.g., from UI or Brain Emergency)
+        """--- Legacy / Aux ---
+        Force a risk level change
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def UpdateConfig(self, request, context):
-        """2. The Configuration: Update parameters (from Legislature/Brain)
+        """Update system config
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
     def GetStream(self, request, context):
-        """3. The Status: Get current health/physics state (for UI)
+        """Stream heartbeat (Legacy, deprecated by WS)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -78,6 +128,26 @@ class ReflexServiceServicer(object):
 
 def add_ReflexServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
+            'GetPhysics': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetPhysics,
+                    request_deserializer=reflex__pb2.Empty.FromString,
+                    response_serializer=reflex__pb2.PhysicsResponse.SerializeToString,
+            ),
+            'GetOODA': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetOODA,
+                    request_deserializer=reflex__pb2.Empty.FromString,
+                    response_serializer=reflex__pb2.OODAResponse.SerializeToString,
+            ),
+            'TriggerVeto': grpc.unary_unary_rpc_method_handler(
+                    servicer.TriggerVeto,
+                    request_deserializer=reflex__pb2.VetoRequest.FromString,
+                    response_serializer=reflex__pb2.Ack.SerializeToString,
+            ),
+            'DemoteProvisional': grpc.unary_unary_rpc_method_handler(
+                    servicer.DemoteProvisional,
+                    request_deserializer=reflex__pb2.DemoteRequest.FromString,
+                    response_serializer=reflex__pb2.Ack.SerializeToString,
+            ),
             'TriggerRatchet': grpc.unary_unary_rpc_method_handler(
                     servicer.TriggerRatchet,
                     request_deserializer=reflex__pb2.RatchetRequest.FromString,
@@ -103,6 +173,114 @@ def add_ReflexServiceServicer_to_server(servicer, server):
  # This class is part of an EXPERIMENTAL API.
 class ReflexService(object):
     """Missing associated documentation comment in .proto file."""
+
+    @staticmethod
+    def GetPhysics(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/reflex.ReflexService/GetPhysics',
+            reflex__pb2.Empty.SerializeToString,
+            reflex__pb2.PhysicsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetOODA(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/reflex.ReflexService/GetOODA',
+            reflex__pb2.Empty.SerializeToString,
+            reflex__pb2.OODAResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def TriggerVeto(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/reflex.ReflexService/TriggerVeto',
+            reflex__pb2.VetoRequest.SerializeToString,
+            reflex__pb2.Ack.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DemoteProvisional(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/reflex.ReflexService/DemoteProvisional',
+            reflex__pb2.DemoteRequest.SerializeToString,
+            reflex__pb2.Ack.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
 
     @staticmethod
     def TriggerRatchet(request,

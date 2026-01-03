@@ -23,6 +23,8 @@ tokio-stream = "0.1"
 futures-util = "0.3"
 tokio-tungstenite = { version = "0.20", features = ["native-tls"] }
 url = "2.5"
+warp = "0.3"
+
 
 # The Memory (Data)
 polars = { version = "0.36", features = ["lazy", "temporal"] }
@@ -33,14 +35,22 @@ chrono = "0.4"
 # The Infrastructure
 config = "0.13"
 dotenvy = "0.15"
-tracing = "0.1"
-tracing-subscriber = "0.3"
 questdb-rs = "6.1.0"
 tokio-postgres = "0.7.15"
-deadpool-postgres = "0.14.1"
-deadpool-redis = "0.13" # Connection Pooling
-redis = { version = "0.23", features = ["tokio-comp"] }
+deadpool-postgres = "0.14"
+deadpool-redis = "0.10"
 rmp-serde = "1.1" # MessagePack Serialization
+
+# Telemetry
+opentelemetry = { version = "0.21", features = ["metrics", "logs"] }
+opentelemetry_sdk = { version = "0.21", features = ["rt-tokio", "metrics", "logs"] }
+opentelemetry-otlp = { version = "0.14", features = ["metrics", "logs"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-opentelemetry = "0.22"
+opentelemetry-appender-tracing = "0.2"
+# Connection Pooling
+redis = { version = "0.21.7", features = ["tokio-comp"] }
 # bincode removed in favor of MessagePack (D-42)
 
 # Cryptography (Auth)
@@ -62,3 +72,7 @@ tonic-build = "0.10"
 [[bin]]
 name = "reflex"
 path = "src/main.rs"
+
+[[bin]]
+name = "audit_runner"
+path = "src/bin/audit_runner.rs"

@@ -66,6 +66,7 @@ class NewsEngine:
 
         self.seen_hashes = deque(maxlen=500)  # Deduplication
         self.latest_sentiment = 0.0  # -1.0 (Panic) to 1.0 (Euphoria)
+        self.latest_headline = "Market is active."  # Default
         self.is_panic = False  # Critical Veto Flag
 
         # Load ONNX Model (Placeholder for now, defaulting to Mock Scorer if missing)
@@ -133,6 +134,7 @@ class NewsEngine:
                         self.latest_sentiment = (
                             0.8 * self.latest_sentiment + 0.2 * sentiment
                         )
+                        self.latest_headline = title
                         logger.info(
                             f"📰 News ({source}): {title} | Sent: {sentiment:.2f}"
                         )
@@ -228,7 +230,7 @@ class NewsEngine:
 
                 # ElKulako/cryptobert mapping: 0: Bearish, 1: Neutral, 2: Bullish
                 bearish_prob = float(probs[0])
-                neutral_prob = float(probs[1])
+                # neutral_prob = float(probs[1]) # Unused
                 bullish_prob = float(probs[2])
 
                 # Composite Score (-1 to 1)
