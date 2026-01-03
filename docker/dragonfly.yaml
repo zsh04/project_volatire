@@ -1,0 +1,13 @@
+services:
+  voltaire_state_l1:
+    image: 'docker.dragonflydb.io/dragonflydb/dragonfly'
+    container_name: voltaire_state_l1
+    ulimits:
+      memlock: -1
+    ports:
+      - "6379:6379"
+    command: 
+      - --cache_mode=true
+      - --maxmemory=4gb
+    restart: always
+    network_mode: bridge

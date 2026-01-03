@@ -1,53 +1,61 @@
-# API Glossary
+# API Glossary: Key Interfaces
 
-**Status:** Public Reference
-**Scope:** Core Class Interfaces for Integration.
+## RiskGuardian
 
-## 1. Safety & Physics (Reflex)
+**Location:** `reflex/src/taleb/mod.rs` (Rust)
 
-### `PhysicsEngine`
+The **Iron Gate**. A deterministic state machine that validates every `TradeProposal` against physics and financial constraints.
 
-The kinematic core. Tracks the "Physical State" of the market.
+**Key Method:** `check(...)`
 
-* **File:** `src/reflex/src/feynman.rs`
-* **Method:** `update(price: f64, timestamp: f64) -> PhysicsState`
-* **Output:** Velocity, Acceleration, Jerk, Entropy, Efficiency.
+```rust
+pub fn check(
+    physics: &PhysicsState,
+    account: &AccountState,
+    intent: &TradeProposal,
+    forecast: (P10, P50, P90),
+    hurdle_rate: f64
+) -> RiskVerdict
+```
 
-### `RiskGuardian`
+**Checks:**
 
-The "Iron Gate" policy engine.
+1. **TTL:** Is the forecast < 60s old?
+2. **Jerk:** Is momentum stable? (`Jerk < 25`)
+3. **Entropy:** Is the market orderly? (`Entropy < 0.90`)
+4. **Omega:** Is the risk/reward asymmetric? (`Omega > 1.5`)
+5. **Insolvency:** Do we have enough cash?
 
-* **File:** `src/reflex/src/taleb/mod.rs`
-* **Method:** `check(physics, account, intent, forecast...) -> RiskVerdict`
-* **Output:** `Allowed`, `Veto(Reason)`, `Panic`.
-* **Key Logic:** Omega Ratio < 1.5 $\to$ Veto.
+---
 
-## 2. Intelligence (Brain)
+## KeplerOracle
 
-### `KeplerOracle`
+**Location:** `src/brain/src/kepler/engine.py` (Python)
+**Models:** `amazon/chronos-bolt-small`
 
-The probabilistic forecasting engine (Chronos-Bolt).
+The **Prophet**. Wraps the Chronos-Bolt Probabilistic Time Series model.
 
-* **File:** `src/brain/src/kepler/engine.py`
-* **Method:** `generate_forecast(df: pd.DataFrame, horizon: int) -> pd.DataFrame`
-* **Output:** Time-series of Quantiles (P10, P50, P90).
+**Key Method:** `generate_forecast(df, horizon=10)`
 
-### `BoydStrategist`
+- **Input:** DataFrame with `price` history.
+- **Output:** DataFrame with quantiles `p10`...`p90` for next `horizon` steps.
+- **Features:**
+  - **Caching:** Caches forecasts for 60s to prevent GPU overload.
+  - **Mock Mode:** Auto-fallbacks to synthetic "Fan Charts" if GPU/Torch fails.
 
-The OODA Loop decision synthesizer.
+---
 
-* **File:** `src/brain/src/boyd/engine.py`
-* **Method:** `decide(market_data, valuation, regime, forecast) -> TradeDecision`
-* **Logic:**
-  * **Long:** Undervalued + Positive Skew (P90-P50 > P50-P10).
-  * **Short:** Overvalued + Negative Skew.
+## PhysicsEngine
 
-## 3. Neural Networks
+**Location:** `reflex/src/feynman.rs` (Rust)
 
-### `EchoStateNetwork` (Simons)
+The **Observer**. Maintains a rolling window of market history to compute derivatives and thermodynamics.
 
-Reservoir Computing for non-linear valuation.
+**Key Method:** `update(price, timestamp) -> PhysicsState`
 
-* **File:** `src/reflex/src/simons.rs`
-* **Method:** `train(target: f64)`, `forward(input: f64) -> f64`.
-* **Architecture:** Fixed Reservoir ($W_{res}$), Learned Readout ($W_{out}$) via RLS.
+- **State:**
+  - `velocity`: 1st Derivative (Trend).
+  - `acceleration`: 2nd Derivative (Momentum).
+  - `jerk`: 3rd Derivative (Crash Risk).
+  - `volatility`: Realized Vol (Welford).
+  - `efficiency`: Fractal Dimension proxy.

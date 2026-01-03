@@ -7,6 +7,8 @@ pub mod taleb;
 pub mod audit;
 pub mod simons;
 pub mod execution;
+pub mod governor;
+pub mod brain;
 // mod server; // Disable for Directive-11 Verification (Client focus)
 
 use std::time::{Duration, Instant};
@@ -62,6 +64,31 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
          eprintln!("❌ QuestDB SQL Connection: FAILED - Check Docker Container");
          eprintln!("   URL: {}", db_url);
     }
+
+    // --- Directive-41 & 42: State Supercharger & Kinetic Pipe ---
+    let redis_url = "redis://localhost:6379/";
+    println!("⚡ Connecting to DragonflyDB (L1 State) at {}...", redis_url);
+    
+    // Initialize Pool
+    let state_store_res = db::state::RedisStateStore::new(redis_url).await;
+    let state_store = match state_store_res {
+        Ok(s) => {
+             match s.ping().await {
+                 Ok(_) => {
+                     println!("✅ DragonflyDB Connection: ESTABLISHED");
+                     Some(s)
+                 },
+                 Err(e) => {
+                     eprintln!("❌ DragonflyDB PING FAILED: {}", e);
+                     None
+                 }
+             }
+        },
+        Err(e) => {
+            eprintln!("❌ DragonflyDB Connection INIT FAILED: {}", e);
+            None
+        }
+    };
 
     // --- Directive-27: Schema Migration ---
     println!("📦 QUESTDB: Running Migrations on {}...", db_url);
@@ -221,6 +248,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let simons_pred = simons.forward(state.velocity);
         let next_target = state.velocity * 0.99; // Damping target
         simons.train(next_target);
+
+        // --- Directive-42: Kinetic Pipe Sync ---
+        // Fire-and-forget logic for state updates (don't block heavily)
+        if let Some(store) = &state_store {
+            // We clone efficiently if needed or just ref. state is Copy?
+            // PhysicsState is Copy (derived in feynman.rs)
+            if let Err(e) = store.update_kinetics("BTC-USDT", &state).await {
+                eprintln!("⚠️ Failed to sync kinetics: {}", e);
+            }
+        }
 
         // Talk to Brain
         if let Some(client) = &mut client_clone {

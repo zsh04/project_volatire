@@ -38,6 +38,10 @@ tracing-subscriber = "0.3"
 questdb-rs = "6.1.0"
 tokio-postgres = "0.7.15"
 deadpool-postgres = "0.14.1"
+deadpool-redis = "0.13" # Connection Pooling
+redis = { version = "0.23", features = ["tokio-comp"] }
+rmp-serde = "1.1" # MessagePack Serialization
+# bincode removed in favor of MessagePack (D-42)
 
 # Cryptography (Auth)
 hmac = "0.12"
