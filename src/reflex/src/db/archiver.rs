@@ -1,11 +1,10 @@
 use std::sync::Arc;
 use object_store::{ObjectStore, path::Path};
 use object_store::aws::AmazonS3Builder;
-use tokio_postgres::{Client, NoTls};
+use tokio_postgres::Client;
 use parquet::arrow::ArrowWriter;
 use arrow::datatypes::{Schema, Field, DataType, TimeUnit};
 use arrow::array::{Float64Array, TimestampNanosecondArray, RecordBatch};
-use std::collections::HashMap;
 
 pub struct Archiver {
     s3: Arc<dyn ObjectStore>,
@@ -142,7 +141,7 @@ impl Archiver {
 
         // 4. Buffer Parquet in Memory (Synchronous)
         let mut buffer = Vec::new();
-        let mut props = parquet::file::properties::WriterProperties::builder().build();
+        let props = parquet::file::properties::WriterProperties::builder().build();
         let mut writer = ArrowWriter::try_new(&mut buffer, schema.clone(), Some(props))?;
         writer.write(&batch)?;
         writer.close()?;

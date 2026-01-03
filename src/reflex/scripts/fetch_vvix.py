@@ -2,7 +2,7 @@ import os
 import sys
 import logging
 import yfinance as yf  # type: ignore
-import pandas as pd
+
 import pyarrow as pa
 import pyarrow.parquet as pq
 import boto3
@@ -65,7 +65,8 @@ def fetch_and_upload_vvix(dry_run=False):
 
     # 1. Fetch Data
     ticker = yf.Ticker(symbol)
-    df = ticker.history(period="max")
+    # Directive-35: Range 2007-01-03 to Present
+    df = ticker.history(start="2007-01-03", interval="1d")
 
     if df.empty:
         logger.error(f"❌ No data found for {symbol}")
@@ -86,13 +87,26 @@ def fetch_and_upload_vvix(dry_run=False):
     # Standardize column names to lowercase
     df.columns = [c.lower() for c in df.columns]
 
+    # Rename 'date' to 'timestamp' and select columns
+    if "date" in df.columns:
+        df = df.rename(columns={"date": "timestamp"})
+
+    required_cols = ["timestamp", "open", "high", "low", "close"]
+    # Filter to required columns only (drop volume/dividends if present)
+    df = df[required_cols]
+
     # 3. Convert to Parquet
     table = pa.Table.from_pandas(df)
     buffer = BytesIO()
     pq.write_table(table, buffer, compression="snappy")
 
     # 4. Upload to R2
-    file_key = "equities_daily/VVIX/history.parquet"
+    # Directive-35 Path: s3://voltaire/equities/macro/VVIX/
+    file_key = "equities/macro/VVIX/vvix_daily_2007_2025.parquet"
+
+    # Ensure prefix exists (not strictly necessary for S3 but good for path clarity)
+    logger.info(f"🚀 Uploading to: {file_key}")
+
     uploader = R2Uploader(dry_run=dry_run)
     uploader.upload_parquet(file_key, buffer)
 

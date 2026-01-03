@@ -1,68 +1,38 @@
-# Service Architecture
+# Service Catalog: The Nervous System
 
-**Architecture:** Bi-Cameral (Two Minds)
-**Communication:** gRPC (Protobuf)
-**Latency Target:** < 5ms (Tick-to-Decision)
+**Reference:** `protos/brain.proto`, `reflex/src/server.rs`
 
-The system is split into two hemispheres:
+## 1. The OODA Loop
 
-1. **Reflex (Rust):** The Fast Brain. Handles Physics, Risk, and Execution.
-2. **Brain (Python):** The Slow Brain. Handles Forecasting, Strategy, and Macro Reasoning.
+The system operates on a continuous Observation-Orientation-Decision-Action loop, mediated by gRPC.
 
-## 1. Service Catalog
+1. **Reflex (Body):** Ingests Market Data ($v, j, H$).
+2. **Reflex -> Brain:** Sends `Reason(StateVector)`.
+3. **Brain (Mind):** Consults Kepler (Forecast) + Boyd (Strategy).
+4. **Brain -> Reflex:** Returns `StrategyIntent` (Buy/Sell + Confidence).
+5. **Reflex:** Validates via `RiskGuardian`.
+6. **Reflex:** Executes via `ExecutionActor`.
 
-### BrainService (`brain.proto`)
+## 2. BrainService (gRPC)
 
-The primary interface for the Python hemisphere.
+**Port:** `50051` (Default)
 
-| RPC | Type | Description |
-|:---|:---|:---|
-| `Reason` | Unary | **The Core Loop.** Reflex sends current state ($\Psi_t$); Brain returns Strategy Intent. |
-| `Forecast` | Unary | Demand a probabilistic forecast (Chronos) for a given history window. |
-| `NotifyRegimeChange` | Unary | Reflex alerts Brain of phase transitions (Laminar $\to$ Turbulent). |
-| `Heartbeat` | Unary | Health check to ensure the Python process is alive and inference-ready. |
+| RPC Method | Input | Output | Description |
+| :--- | :--- | :--- | :--- |
+| `Reason` | `StateVector` | `StrategyIntent` | Core decision loop. Submits current physics state, receives trading orders. |
+| `Forecast` | `HistoryWindow` | `ForecastResult` | Requests a pure price/volatility forecast (Kepler) without trade logic. |
+| `Heartbeat` | `Pulse` | `PulseAck` | Liveness check to ensure the "Mind" is awake. |
+| `NotifyRegimeChange` | `RegimeEvent` | `Empty` | Alerts Brain of macro shifts (e.g., Volatility Spikes). |
 
-### ReflexService (`reflex.proto`)
+## 3. ReflexServer (gRPC)
 
-The control plane for the Rust hemisphere.
+**Port:** `50052` (Default)
+**Component:** `reflex/src/server.rs`
 
-| RPC | Type | Description |
-|:---|:---|:---|
-| `TriggerRatchet` | Unary | **Emergency Brake.** External command to tighten risk or panic (Kill Switch). |
-| `UpdateConfig` | Unary | Dynamic parameter tuning (e.g., changing $\alpha$ for ESN). |
-| `GetStream` | Streaming | Real-time telemetry stream for the UI (Vue/React). |
+Reflex acts as a server mainly for Control Plane interactions (Dashboard/CLI).
 
-### MacroSynapse (`macro.proto`)
-
-The conduit for Economic Gravity.
-
-| RPC | Type | Description |
-|:---|:---|:---|
-| `SyncMacroState` | Unary | Pushes global macro factors (Interest Rates, GDP) from Brain $\to$ Reflex. |
-
-## 2. The OODA Loop (Data Flow)
-
-The Tick-to-Trade lifecycle follows the OODA (Observe, Orient, Decide, Act) loop:
-
-1. **Observe (Reflex):**
-    * `FastSocket` receives Market Tick.
-    * `PhysicsEngine` computes Velocity, Acceleration, Jerk.
-    * `Simons` (ESN) updates reservoir state.
-
-2. **Orient (Brain):**
-    * Reflex calls `Brain.Reason(StateVector)`.
-    * Brain checks `Hypatia` (Context/Memory).
-    * `Kepler` (Chronos) generates Forecast Distribution ($P_{10}, P_{50}, P_{90}$).
-
-3. **Decide (Brain/Reflex):**
-    * Brain generates `StrategyIntent` (Buy/Sell, Confidence).
-    * Reflex receives Intent.
-    * **Taleb (Risk)** audits the intent against:
-        * Physics (Jerk check).
-        * Math (Omega Ratio check).
-        * Capital (Drawdown check).
-
-4. **Act (Reflex):**
-    * If `RiskVerdict::Allowed`: Order is sent to Exchange.
-    * `AccountState` updated.
-    * Telemetry emitted to GUI.
+| RPC Method | Input | Output | Description |
+| :--- | :--- | :--- | :--- |
+| `GetStream` | `Empty` | `stream Heartbeat` | Telemetry stream for Dashboards (Simulates pulse). |
+| `TriggerRatchet` | `RatchetRequest` | `Ack` | Manual intervention (e.g., "Tighten Stops"). |
+| `UpdateConfig` | `ConfigPayload` | `Ack` | Hot-swap parameters (e.g., `MAX_JERK`). |
