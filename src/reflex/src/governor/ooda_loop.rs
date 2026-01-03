@@ -2,15 +2,12 @@ use std::time::{Duration, Instant};
 
 // --- Data Structures ---
 
-#[derive(Debug, Clone)]
-pub struct PhysicsState {
-    pub symbol: String,
-    pub price: f64,
-    pub velocity: f64,
-    pub acceleration: f64,
-    pub jerk: f64,
-    pub basis: f64, // CME Basis
-}
+pub use crate::feynman::PhysicsState;
+
+use crate::telemetry::forensics::DecisionPacket;
+use tokio::sync::mpsc;
+use opentelemetry::trace::TraceContextExt;
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[derive(Debug, Clone)]
 pub struct OODAState {
@@ -18,6 +15,7 @@ pub struct OODAState {
     pub sentiment_score: Option<f64>, // Narrative (Hypatia)
     pub nearest_regime: Option<String>, // Memory (LanceDB)
     pub oriented_at: Instant,
+    pub trace_id: String, // Traceability link
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -46,46 +44,76 @@ pub struct OODACore {
     pub jitter_threshold: Duration,
     pub provisional: ProvisionalExecutive,
     pub veto_gate: VetoGate,
+    pub forensic_tx: Option<mpsc::Sender<DecisionPacket>>,
+    pub mirror_tx: Option<mpsc::Sender<DecisionPacket>>,
+    pub decay_tx: Option<mpsc::Sender<DecisionPacket>>,
 }
 
+use crate::client::BrainClient;
+
 impl OODACore {
-    pub fn new() -> Self {
+    pub fn new(
+        forensic_tx: Option<mpsc::Sender<DecisionPacket>>,
+        mirror_tx: Option<mpsc::Sender<DecisionPacket>>,
+        decay_tx: Option<mpsc::Sender<DecisionPacket>>
+    ) -> Self {
         Self {
             jitter_threshold: Duration::from_millis(20),
             provisional: ProvisionalExecutive::new(),
             veto_gate: VetoGate::new(),
+            forensic_tx,
+            mirror_tx,
+            decay_tx,
         }
     }
+
+
 
     /// OBSERVE -> ORIENT
     /// Fuses real-time Physics with asynchronous Semantic checks.
     /// Implements "Jitter" Fallback: If Semantics take too long, we proceed with Safety.
-    pub fn orient(&self, physics: PhysicsState) -> OODAState {
+    #[tracing::instrument(skip(self, client))]
+    pub async fn orient(&mut self, physics: PhysicsState, client: Option<&mut BrainClient>) -> OODAState {
         let start = Instant::now();
         
-        // 1. Asynchronous Fetch Simulation (Hypatia/Memory)
-        // In real rust this would be `tokio::select!` or `join!`. 
-        // Here we simulate the external latency.
-        let (sentiment, regime) = self.fetch_semantics_simulated();
-        
-        // 2. Jitter Check
-        let duration = start.elapsed();
-        if duration > self.jitter_threshold {
-            // "Jitter" Solution: Latency exceeded logic.
-            // We ignore late signals to keep the loop kinetic.
-            return OODAState {
-                physics,
-                sentiment_score: None, // Discard
-                nearest_regime: None,  // Discard
-                oriented_at: Instant::now(),
-            };
-        }
+        // Capture TraceID from current span
+        let span = tracing::Span::current();
+        let cx = span.context();
+        let trace_id = cx.span().span_context().trace_id().to_string();
+
+        // 1. Asynchronous Fetch Logic
+        let (sentiment, regime) = if let Some(c) = client {
+            // LIVE PATH (D-54)
+            // Enforce Jitter Budget (e.g., 20ms) via Timeout
+            match tokio::time::timeout(
+                self.jitter_threshold,
+                c.get_context(physics.price, physics.velocity)
+            ).await {
+                Ok(Ok(ctx)) => (Some(ctx.sentiment_score), Some(ctx.nearest_regime)),
+                Ok(Err(e)) => {
+                    tracing::warn!("Brain Error: {}", e);
+                    (None, None) // Error -> Blind
+                },
+                Err(_) => {
+                    tracing::warn!("Brain Timeout (Jitter Violated)");
+                    (None, None) // Timeout -> Blind
+                }
+            }
+        } else {
+            // SIM PATH (Mock)
+            self.fetch_semantics_simulated()
+        };
+
+        // 2. Final Jitter Check (Redundant if timeout works, but good for local processing tracking)
+        // If we spent > threshold just on overhead, we might still want to skip? 
+        // But for now, we trust the result if we got it.
 
         OODAState {
             physics,
             sentiment_score: sentiment,
             nearest_regime: regime,
             oriented_at: Instant::now(),
+            trace_id,
         }
     }
 
@@ -103,6 +131,7 @@ impl OODACore {
     /// Weighted Voting: Simons (Physics), Kepler (MeanRev), Hypatia (Sentiment)
     /// Now includes Directive-43: Provisional Risk Sizing
     /// Now includes Directive-45: Nuclear Veto (Double-Key)
+    #[tracing::instrument(skip(self))]
     pub fn decide(&mut self, state: &OODAState) -> Decision {
         let physics = &state.physics;
         
@@ -120,11 +149,13 @@ impl OODACore {
         // Mocking Omega = 1.2 normally.
         let mock_omega = 1.2; 
         if self.veto_gate.check_hard_stop(physics, mock_omega) {
-             return Decision {
+             let d = Decision {
                 action: Action::Halt,
                 reason: "NUCLEAR VETO: Sentiment + Physics Collapse".to_string(),
                 confidence: 1.0,
             };
+            self.log_forensics(state, &d, 0.0); // 0.0 risk
+            return d;
         }
 
         // 3. Update Provisional Executive
@@ -149,6 +180,7 @@ impl OODACore {
         let _promoted = self.provisional.update(physics, entropy, efficiency);
         let max_risk = self.provisional.get_current_max_risk();
 
+
         // 4. Initial Signal from Simons (Pattern/Physics)
         // Simple heuristic: Positive Acceleration = Buy Signal
         let mut base_signal: f64 = if physics.acceleration > 0.0 { 1.0 } else { -1.0 };
@@ -159,11 +191,13 @@ impl OODACore {
             // VETO: Physics says Buy (1.0), but Sentiment is Negative (< -0.5)
             // Note: This is separate from Nuclear Veto. This is just "Don't Buy".
             if base_signal > 0.0 && sentiment < -0.5 {
-                return Decision {
+                 let d = Decision {
                     action: Action::Hold, // Or Reduce
                     reason: format!("VETO: Hypatia Sentiment ({}) overruled Physics.", sentiment),
                     confidence: 1.0, 
                 };
+                self.log_forensics(state, &d, max_risk);
+                return d;
             }
         } else {
             // MODE: Jitter Fallback (Blind Physics)
@@ -172,7 +206,7 @@ impl OODACore {
         }
         
         // 6. Final Decision Construction w/ Provisional Sizing
-        if base_signal >= 0.5 {
+        let decision = if base_signal >= 0.5 {
             Decision {
                 action: Action::Buy(max_risk * base_signal.abs()), // Apply Provisional Limit
                 reason: format!("Physics & Sentiment Aligned. Risk Tier: {}", self.provisional.current_tier_index),
@@ -189,6 +223,44 @@ impl OODACore {
                 action: Action::Hold,
                 reason: "Uncertain / Risk Floor".to_string(),
                 confidence: 0.5,
+            }
+        };
+
+        self.log_forensics(state, &decision, max_risk);
+        decision
+    }
+
+    fn log_forensics(&self, state: &OODAState, decision: &Decision, _max_risk: f64) {
+        let mut packet = DecisionPacket {
+            timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_secs_f64(),
+            trace_id: state.trace_id.clone(),
+            physics: state.physics.clone(),
+            sentiment: state.sentiment_score.unwrap_or(0.0),
+            vector_distance: 0.0, // TODO: Retrieve from Semantic Fetch
+            quantile_score: self.provisional.current_tier_index as i32,
+            decision: format!("{:?}", decision.action),
+            operator_hash: String::new(),
+        };
+        packet.seal();
+        
+        // 1. Send to The Scribe (Forensics) - Fire & Forget
+        if let Some(tx) = &self.forensic_tx {
+             if let Err(e) = tx.try_send(packet.clone()) {
+                tracing::warn!("⚠️ Forensic Log Dropped (Channel Full): {}", e);
+            }
+        }
+
+        // 2. Send to The Mirror (Audit Core) - Fire & Forget
+        if let Some(tx) = &self.mirror_tx {
+             if let Err(e) = tx.try_send(packet.clone()) {
+                tracing::warn!("⚠️ Mirror Packet Dropped (Channel Full): {}", e);
+            }
+        }
+
+        // 3. Send to The Decay Monitor (Directive-52) - Fire & Forget
+        if let Some(tx) = &self.decay_tx {
+             if let Err(e) = tx.try_send(packet) {
+                tracing::warn!("⚠️ Decay Packet Dropped (Channel Full): {}", e);
             }
         }
     }
@@ -211,22 +283,22 @@ impl OODACore {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_veto_logic() {
-        let mut core = OODACore::new();
+    #[tokio::test]
+    async fn test_veto_logic() {
+        let mut core = OODACore::new(None, None, None);
         
         // Case: Bullish Physics
+        // Case: Bullish Physics
         let physics = PhysicsState {
-            symbol: "BTC".to_string(),
             price: 50000.0,
             velocity: 10.0,
             acceleration: 5.0, // Bullish
             jerk: 0.1,
-            basis: 0.0,
+            ..Default::default()
         };
 
-        // Standard Orient
-        let state = core.orient(physics);
+        // Standard Orient (Simulated)
+        let state = core.orient(physics, None).await;
         
         // Decide
         let decision = core.decide(&state);
@@ -238,16 +310,15 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_jitter_fallback_logic() {
-        let mut core = OODACore::new();
+    #[tokio::test]
+    async fn test_jitter_fallback_logic() {
+        let mut core = OODACore::new(None, None, None);
         let physics = PhysicsState {
-            symbol: "BTC".to_string(),
             price: 50000.0,
             velocity: 10.0,
             acceleration: 5.0,
             jerk: 0.1,
-            basis: 0.0,
+            ..Default::default()
         };
 
         // Manually construct a "Blind" State (Jitter Fallback)
@@ -256,6 +327,7 @@ mod tests {
             sentiment_score: None,
             nearest_regime: None,
             oriented_at: Instant::now(),
+            trace_id: "test_trace".to_string(),
         };
 
         let decision = core.decide(&blind_state);
@@ -271,21 +343,21 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_cycle_latency() {
-        let mut core = OODACore::new();
+    #[tokio::test]
+    async fn test_cycle_latency() {
+        let mut core = OODACore::new(None, None, None);
         let physics = PhysicsState {
-            symbol: "BTC".to_string(),
             price: 50000.0,
             velocity: 0.0,
             acceleration: 0.0,
             jerk: 0.0,
-            basis: 0.0,
+            ..Default::default()
         };
 
         let start = Instant::now();
         for _ in 0..10_000 {
-            let state = core.orient(physics.clone());
+            // Using logic internal simulation for speed test
+            let state = core.orient(physics.clone(), None).await;
             let dec = core.decide(&state);
             core.act(dec);
         }

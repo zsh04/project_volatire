@@ -24,31 +24,35 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0b\x62rain.proto\x12\x05\x62rain\"\x07\n\x05\x45mpty\")\n\x05Pulse\x12\x11\n\ttimestamp\x18\x01 \x01(\x03\x12\r\n\x05organ\x18\x02 \x01(\t\",\n\x08PulseAck\x12\r\n\x05\x61live\x18\x01 \x01(\x08\x12\x11\n\ttimestamp\x18\x02 \x01(\x03\"D\n\x0bRegimeEvent\x12\x0e\n\x06regime\x18\x01 \x01(\t\x12\x12\n\nvolatility\x18\x02 \x01(\x01\x12\x11\n\tliquidity\x18\x03 \x01(\x01\"\x80\x01\n\nMacroState\x12\x16\n\x0erisk_free_rate\x18\x01 \x01(\x01\x12\x16\n\x0einflation_rate\x18\x02 \x01(\x01\x12\x14\n\x0cstress_index\x18\x03 \x01(\x01\x12\x17\n\x0fsentiment_score\x18\x04 \x01(\x01\x12\x13\n\x0bhurdle_rate\x18\x05 \x01(\x01\"o\n\x0bStateVector\x12\r\n\x05price\x18\x01 \x01(\x01\x12\x10\n\x08velocity\x18\x02 \x01(\x01\x12\x13\n\x0bvol_cluster\x18\x03 \x01(\x01\x12\x0f\n\x07\x65ntropy\x18\x04 \x01(\x01\x12\x19\n\x11simons_prediction\x18\x05 \x01(\x01\"\x91\x02\n\x0eStrategyIntent\x12\x0e\n\x06\x61\x63tion\x18\x01 \x01(\t\x12\x12\n\nconfidence\x18\x02 \x01(\x01\x12\x12\n\nmodel_used\x18\x03 \x01(\t\x12\x14\n\x0c\x66orecast_p10\x18\x04 \x01(\x01\x12\x14\n\x0c\x66orecast_p50\x18\x05 \x01(\x01\x12\x14\n\x0c\x66orecast_p90\x18\x06 \x01(\x01\x12\x1a\n\x12\x66orecast_timestamp\x18\x07 \x01(\x03\x12\x14\n\x0c\x66orecast_p20\x18\x08 \x01(\x01\x12\x14\n\x0c\x66orecast_p80\x18\t \x01(\x01\x12\x13\n\x0bhurdle_rate\x18\n \x01(\x01\x12(\n\rmacro_context\x18\x0b \x01(\x0b\x32\x11.brain.MacroState\"E\n\rHistoryWindow\x12\x0e\n\x06prices\x18\x01 \x03(\x01\x12\x0f\n\x07volumes\x18\x02 \x03(\x01\x12\x13\n\x0bwindow_size\x18\x03 \x01(\x05\"H\n\x0e\x46orecastResult\x12\x0b\n\x03p10\x18\x01 \x01(\x01\x12\x0b\n\x03p50\x18\x02 \x01(\x01\x12\x0b\n\x03p90\x18\x03 \x01(\x01\x12\x0f\n\x07horizon\x18\x04 \x01(\x01\x32\xe0\x01\n\x0c\x42rainService\x12*\n\tHeartbeat\x12\x0c.brain.Pulse\x1a\x0f.brain.PulseAck\x12\x36\n\x12NotifyRegimeChange\x12\x12.brain.RegimeEvent\x1a\x0c.brain.Empty\x12\x33\n\x06Reason\x12\x12.brain.StateVector\x1a\x15.brain.StrategyIntent\x12\x37\n\x08\x46orecast\x12\x14.brain.HistoryWindow\x1a\x15.brain.ForecastResultb\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0b\x62rain.proto\x12\x05\x62rain\"D\n\x0e\x43ontextRequest\x12\r\n\x05price\x18\x01 \x01(\x01\x12\x10\n\x08velocity\x18\x02 \x01(\x01\x12\x11\n\ttimestamp\x18\x03 \x01(\x03\"x\n\x0f\x43ontextResponse\x12\x17\n\x0fsentiment_score\x18\x01 \x01(\x01\x12\x16\n\x0enearest_regime\x18\x02 \x01(\t\x12\x17\n\x0fregime_distance\x18\x03 \x01(\x01\x12\x1b\n\x13\x63omputation_time_ns\x18\x04 \x01(\x03\"\x07\n\x05\x45mpty\")\n\x05Pulse\x12\x11\n\ttimestamp\x18\x01 \x01(\x03\x12\r\n\x05organ\x18\x02 \x01(\t\",\n\x08PulseAck\x12\r\n\x05\x61live\x18\x01 \x01(\x08\x12\x11\n\ttimestamp\x18\x02 \x01(\x03\"D\n\x0bRegimeEvent\x12\x0e\n\x06regime\x18\x01 \x01(\t\x12\x12\n\nvolatility\x18\x02 \x01(\x01\x12\x11\n\tliquidity\x18\x03 \x01(\x01\"\x80\x01\n\nMacroState\x12\x16\n\x0erisk_free_rate\x18\x01 \x01(\x01\x12\x16\n\x0einflation_rate\x18\x02 \x01(\x01\x12\x14\n\x0cstress_index\x18\x03 \x01(\x01\x12\x17\n\x0fsentiment_score\x18\x04 \x01(\x01\x12\x13\n\x0bhurdle_rate\x18\x05 \x01(\x01\"o\n\x0bStateVector\x12\r\n\x05price\x18\x01 \x01(\x01\x12\x10\n\x08velocity\x18\x02 \x01(\x01\x12\x13\n\x0bvol_cluster\x18\x03 \x01(\x01\x12\x0f\n\x07\x65ntropy\x18\x04 \x01(\x01\x12\x19\n\x11simons_prediction\x18\x05 \x01(\x01\"\x91\x02\n\x0eStrategyIntent\x12\x0e\n\x06\x61\x63tion\x18\x01 \x01(\t\x12\x12\n\nconfidence\x18\x02 \x01(\x01\x12\x12\n\nmodel_used\x18\x03 \x01(\t\x12\x14\n\x0c\x66orecast_p10\x18\x04 \x01(\x01\x12\x14\n\x0c\x66orecast_p50\x18\x05 \x01(\x01\x12\x14\n\x0c\x66orecast_p90\x18\x06 \x01(\x01\x12\x1a\n\x12\x66orecast_timestamp\x18\x07 \x01(\x03\x12\x14\n\x0c\x66orecast_p20\x18\x08 \x01(\x01\x12\x14\n\x0c\x66orecast_p80\x18\t \x01(\x01\x12\x13\n\x0bhurdle_rate\x18\n \x01(\x01\x12(\n\rmacro_context\x18\x0b \x01(\x0b\x32\x11.brain.MacroState\"E\n\rHistoryWindow\x12\x0e\n\x06prices\x18\x01 \x03(\x01\x12\x0f\n\x07volumes\x18\x02 \x03(\x01\x12\x13\n\x0bwindow_size\x18\x03 \x01(\x05\"H\n\x0e\x46orecastResult\x12\x0b\n\x03p10\x18\x01 \x01(\x01\x12\x0b\n\x03p50\x18\x02 \x01(\x01\x12\x0b\n\x03p90\x18\x03 \x01(\x01\x12\x0f\n\x07horizon\x18\x04 \x01(\x01\x32\x9d\x02\n\x0c\x42rainService\x12*\n\tHeartbeat\x12\x0c.brain.Pulse\x1a\x0f.brain.PulseAck\x12\x36\n\x12NotifyRegimeChange\x12\x12.brain.RegimeEvent\x1a\x0c.brain.Empty\x12\x33\n\x06Reason\x12\x12.brain.StateVector\x1a\x15.brain.StrategyIntent\x12\x37\n\x08\x46orecast\x12\x14.brain.HistoryWindow\x1a\x15.brain.ForecastResult\x12;\n\nGetContext\x12\x15.brain.ContextRequest\x1a\x16.brain.ContextResponseb\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
 _builder.BuildTopDescriptorsAndMessages(DESCRIPTOR, 'brain_pb2', _globals)
 if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
-  _globals['_EMPTY']._serialized_start=22
-  _globals['_EMPTY']._serialized_end=29
-  _globals['_PULSE']._serialized_start=31
-  _globals['_PULSE']._serialized_end=72
-  _globals['_PULSEACK']._serialized_start=74
-  _globals['_PULSEACK']._serialized_end=118
-  _globals['_REGIMEEVENT']._serialized_start=120
-  _globals['_REGIMEEVENT']._serialized_end=188
-  _globals['_MACROSTATE']._serialized_start=191
-  _globals['_MACROSTATE']._serialized_end=319
-  _globals['_STATEVECTOR']._serialized_start=321
-  _globals['_STATEVECTOR']._serialized_end=432
-  _globals['_STRATEGYINTENT']._serialized_start=435
-  _globals['_STRATEGYINTENT']._serialized_end=708
-  _globals['_HISTORYWINDOW']._serialized_start=710
-  _globals['_HISTORYWINDOW']._serialized_end=779
-  _globals['_FORECASTRESULT']._serialized_start=781
-  _globals['_FORECASTRESULT']._serialized_end=853
-  _globals['_BRAINSERVICE']._serialized_start=856
-  _globals['_BRAINSERVICE']._serialized_end=1080
+  _globals['_CONTEXTREQUEST']._serialized_start=22
+  _globals['_CONTEXTREQUEST']._serialized_end=90
+  _globals['_CONTEXTRESPONSE']._serialized_start=92
+  _globals['_CONTEXTRESPONSE']._serialized_end=212
+  _globals['_EMPTY']._serialized_start=214
+  _globals['_EMPTY']._serialized_end=221
+  _globals['_PULSE']._serialized_start=223
+  _globals['_PULSE']._serialized_end=264
+  _globals['_PULSEACK']._serialized_start=266
+  _globals['_PULSEACK']._serialized_end=310
+  _globals['_REGIMEEVENT']._serialized_start=312
+  _globals['_REGIMEEVENT']._serialized_end=380
+  _globals['_MACROSTATE']._serialized_start=383
+  _globals['_MACROSTATE']._serialized_end=511
+  _globals['_STATEVECTOR']._serialized_start=513
+  _globals['_STATEVECTOR']._serialized_end=624
+  _globals['_STRATEGYINTENT']._serialized_start=627
+  _globals['_STRATEGYINTENT']._serialized_end=900
+  _globals['_HISTORYWINDOW']._serialized_start=902
+  _globals['_HISTORYWINDOW']._serialized_end=971
+  _globals['_FORECASTRESULT']._serialized_start=973
+  _globals['_FORECASTRESULT']._serialized_end=1045
+  _globals['_BRAINSERVICE']._serialized_start=1048
+  _globals['_BRAINSERVICE']._serialized_end=1333
 # @@protoc_insertion_point(module_scope)

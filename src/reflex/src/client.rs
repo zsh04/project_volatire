@@ -37,4 +37,22 @@ impl BrainClient {
         let response = self.client.reason(request).await?;
         Ok(response.into_inner())
     }
+
+    pub async fn get_context(
+        &mut self,
+        price: f64,
+        velocity: f64,
+    ) -> Result<brain::ContextResponse, tonic::Status> {
+        let request = tonic::Request::new(brain::ContextRequest {
+            price,
+            velocity,
+            timestamp: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as i64,
+        });
+
+        let response = self.client.get_context(request).await?;
+        Ok(response.into_inner())
+    }
 }

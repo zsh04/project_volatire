@@ -15,6 +15,7 @@ pub struct PhysicsState {
     pub volatility: f64,    // Realized Volatility ($\sigma$)
     pub entropy: f64,       // Shannon Entropy ($H$)
     pub efficiency_index: f64, // Kaufman Efficiency Ratio
+    pub basis: f64,         // Futures Basis (Annualized)
 }
 
 impl Default for PhysicsState {
@@ -28,6 +29,7 @@ impl Default for PhysicsState {
             volatility: 0.0,
             entropy: 0.0,
             efficiency_index: 0.0,
+            basis: 0.0,
         }
     }
 }
@@ -151,6 +153,7 @@ impl PhysicsEngine {
             volatility,
             entropy,
             efficiency_index,
+            basis: 0.0, // Default to 0.0 until Ingest Pipeline feeds Basis
         };
 
         self.prev_state = new_state;

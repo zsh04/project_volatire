@@ -1,4 +1,4 @@
-use crate::governor::ooda_loop::PhysicsState;
+use crate::feynman::PhysicsState;
 
 pub struct RiemannEngine;
 
@@ -21,18 +21,18 @@ impl RiemannEngine {
         // ideally 0 = Bad for Momentum, 1 = Good for Momentum
         
         // Efficiency: Direct mapping. 1.0 is pure trend.
-        let n_eta = efficiency.clamp(0.0, 1.0);
+        let n_eta = efficiency.clamp(0.0f64, 1.0f64);
         
         // Entropy: Inverse. High entropy (randomness) is bad for simple momentum.
         // Assuming Entropy range 0..3ish.
-        let n_entropy = (1.0 - (entropy / 3.0)).clamp(0.0, 1.0);
+        let n_entropy = (1.0f64 - (entropy / 3.0f64)).clamp(0.0f64, 1.0f64);
         
         // Jerk: Inverse. Low jerk is smooth trend.
         // Normalize 0..1.0 range usually found in stable moves.
-        let n_jerk = (1.0 - physics.jerk.abs().clamp(0.0, 1.0)).clamp(0.0, 1.0);
+        let n_jerk = (1.0f64 - physics.jerk.abs().clamp(0.0f64, 1.0f64)).clamp(0.0f64, 1.0f64);
 
         // Confidence: Direct.
-        let n_conf = simons_confidence.clamp(0.0, 1.0);
+        let n_conf = simons_confidence.clamp(0.0f64, 1.0f64);
 
         // 3. Weighted Consensus
         // Directive: "If eta > 0.85, favor Momentum even if Entropy is elevated"
@@ -67,12 +67,11 @@ mod tests {
     fn test_trend_purity() {
         // High Efficiency, Moderate Entropy, Low Jerk -> Should be High Momentum
         let p = PhysicsState {
-            symbol: "BTC".to_string(),
             price: 100.0,
             velocity: 1.0,
             acceleration: 0.0,
             jerk: 0.01,
-            basis: 0.0,
+            ..Default::default()
         };
         let entropy = 1.5; // Moderate disorder
         let efficiency = 0.9; // Very High Efficiency (Laminar)
@@ -88,12 +87,11 @@ mod tests {
     fn test_structural_noise() {
         // Flash Crash Scenario
         let p = PhysicsState {
-            symbol: "BTC".to_string(),
             price: 100.0,
             velocity: -100.0,
             acceleration: -500.0,
             jerk: 60.0, // > 50.0 Threshold
-            basis: 0.0,
+            ..Default::default()
         };
         
         let riemann_prob = RiemannEngine::calculate_riemann_probability(&p, 0.5, 0.5, 0.5);
@@ -104,12 +102,11 @@ mod tests {
     #[test]
     fn test_benchmark_speed() {
         let p = PhysicsState {
-            symbol: "BTC".to_string(),
             price: 100.0,
             velocity: 1.0,
             acceleration: 0.0,
             jerk: 0.01,
-            basis: 0.0,
+            ..Default::default()
         };
         
         let start = std::time::Instant::now();

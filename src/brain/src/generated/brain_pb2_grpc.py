@@ -56,6 +56,11 @@ class BrainServiceStub(object):
                 request_serializer=brain__pb2.HistoryWindow.SerializeToString,
                 response_deserializer=brain__pb2.ForecastResult.FromString,
                 _registered_method=True)
+        self.GetContext = channel.unary_unary(
+                '/brain.BrainService/GetContext',
+                request_serializer=brain__pb2.ContextRequest.SerializeToString,
+                response_deserializer=brain__pb2.ContextResponse.FromString,
+                _registered_method=True)
 
 
 class BrainServiceServicer(object):
@@ -91,6 +96,13 @@ class BrainServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetContext(self, request, context):
+        """Context: Reflex asks Brain for Semantic Context (Memory + Sentiment).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_BrainServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -113,6 +125,11 @@ def add_BrainServiceServicer_to_server(servicer, server):
                     servicer.Forecast,
                     request_deserializer=brain__pb2.HistoryWindow.FromString,
                     response_serializer=brain__pb2.ForecastResult.SerializeToString,
+            ),
+            'GetContext': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetContext,
+                    request_deserializer=brain__pb2.ContextRequest.FromString,
+                    response_serializer=brain__pb2.ContextResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -225,6 +242,33 @@ class BrainService(object):
             '/brain.BrainService/Forecast',
             brain__pb2.HistoryWindow.SerializeToString,
             brain__pb2.ForecastResult.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetContext(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/brain.BrainService/GetContext',
+            brain__pb2.ContextRequest.SerializeToString,
+            brain__pb2.ContextResponse.FromString,
             options,
             channel_credentials,
             insecure,

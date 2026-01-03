@@ -1,5 +1,6 @@
 use std::time::Instant;
-use crate::governor::ooda_loop::PhysicsState;
+use crate::feynman::PhysicsState;
+use opentelemetry::{global, KeyValue};
 
 #[derive(Debug, Clone)]
 pub struct VetoGate {
@@ -47,10 +48,18 @@ impl VetoGate {
         // Condition C: Negative Expected Value
         let is_negative_ev = omega_ratio < 1.0;
 
-        // Result: HALT only if ALL conditions are met.
-        // "An absolute halt is only permitted if the narrative is extremely negative AND the market physics are showing non-linear instability."
+        // 3. Double-Key Trigger: "Qualitative Panic" AND "Quantitative Chaos"
         if is_extreme_narrative && is_chaos && is_negative_ev {
-            return true;
+            // SAFETY: Record Veto Metric
+            let meter = global::meter("voltaire_reflex");
+            let counter = meter.u64_counter("veto.trigger").init();
+            counter.add(1, &[
+                KeyValue::new("reason", "nuclear_double_key"),
+                KeyValue::new("jerk", physics.jerk.to_string()),
+                KeyValue::new("sentiment", decayed_sentiment.to_string()),
+            ]);
+            
+            return true; // NUCLEAR HALT
         }
 
         false
@@ -67,12 +76,11 @@ mod tests {
         gate.update_sentiment(-1.0); // Extreme panic headline
 
         let physics_calm = PhysicsState {
-            symbol: "BTC".to_string(),
             price: 100.0,
             velocity: 0.0,
             acceleration: 0.0,
             jerk: 5.0, // Calm
-            basis: 0.0,
+            ..Default::default()
         };
 
         // Should return FALSE because physics is calm
@@ -85,12 +93,11 @@ mod tests {
         gate.update_sentiment(-0.95);
 
         let physics_chaos = PhysicsState {
-            symbol: "BTC".to_string(),
             price: 100.0,
             velocity: -100.0,
             acceleration: -50.0,
             jerk: 60.0, // > 50 Chaos
-            basis: 0.0,
+            ..Default::default()
         };
 
         // All conditions met: Sentiment < -0.9, Jerk > 50, Omega < 1.0

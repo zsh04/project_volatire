@@ -16,6 +16,22 @@ service BrainService {
 
     // Prediction: Reflex asks Brain to forecast future price/volatility.
     rpc Forecast (HistoryWindow) returns (ForecastResult);
+
+    // Context: Reflex asks Brain for Semantic Context (Memory + Sentiment).
+    rpc GetContext (ContextRequest) returns (ContextResponse);
+}
+
+message ContextRequest {
+    double price = 1;
+    double velocity = 2; // For finding similar kinematic regimes
+    int64 timestamp = 3;
+}
+
+message ContextResponse {
+    double sentiment_score = 1; // -1.0 to 1.0 (D-38)
+    string nearest_regime = 2; // "Liquidity Crisis 2020" (D-37)
+    double regime_distance = 3; // Vector distance
+    int64 computation_time_ns = 4;
 }
 
 message Empty {}
