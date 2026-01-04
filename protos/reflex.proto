@@ -20,8 +20,8 @@ service ReflexService {
   rpc TriggerRatchet (RatchetRequest) returns (Ack);
   // Update system config
   rpc UpdateConfig (ConfigPayload) returns (Ack);
-  // Stream heartbeat (Legacy, deprecated by WS)
-  rpc GetStream (Empty) returns (stream Heartbeat);
+  // Stream Physics Data (Live Telemetry)
+  rpc GetStream (Empty) returns (stream PhysicsResponse);
 }
 
 // --- Messages ---
@@ -34,6 +34,22 @@ message PhysicsResponse {
     double entropy = 5;
     double efficiency_index = 6;
     double timestamp = 7;
+    
+    // Account State
+    double unrealized_pnl = 8;
+    double equity = 9;
+    double balance = 10;
+    
+    // Model Telemetry
+    double gemma_tokens_per_sec = 11;
+    double gemma_latency_ms = 12; // 12
+    
+    // Governance (Safety Staircase)
+    int32 staircase_tier = 13; // 0=Q0, 1=Q1 ...
+    double staircase_progress = 14; 
+    
+    // Audit Telemetry
+    double audit_drift = 15;
 }
 
 message OODAResponse {

@@ -3,6 +3,7 @@ __pycache__/
 *.py[cod]
 .venv
 .env
+.env.local
 
 # Rust
 target/
@@ -14,3 +15,11 @@ docs/internal/
 data/
 .DS_Store
 src/brain/models/**/*.onnx
+
+# Node
+node_modules/
+.next/
+out/
+build/
+dist/
+src/interface/.next/

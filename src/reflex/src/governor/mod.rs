@@ -1,3 +1,10 @@
 pub mod ooda_loop;
 pub mod provisional;
 pub mod superposition;
+pub mod wave_legislator;
+pub mod staircase;
+pub mod regime_detector;
+pub mod audit_loop;
+pub mod kill_switch;
+pub mod supervise;
+pub mod genesis;

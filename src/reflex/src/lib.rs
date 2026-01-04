@@ -8,6 +8,8 @@ pub mod audit;
 pub mod simons;
 pub mod execution;
 pub mod governor;
+pub mod gateway;
+pub mod auditor;
 pub mod brain;
 pub mod telemetry;
 pub mod sim;
