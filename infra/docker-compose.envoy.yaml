@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  envoy:
+    image: envoyproxy/envoy:v1.31-latest
+    container_name: voltaire-envoy
+    ports:
+      - "8080:8080"  # gRPC-web port
+      - "9901:9901"  # Envoy admin
+    volumes:
+      - ./envoy.yaml:/etc/envoy/envoy.yaml:ro
+    command: /usr/local/bin/envoy -c /etc/envoy/envoy.yaml
+    network_mode: host  # Access host's localhost:50051
+    restart: unless-stopped

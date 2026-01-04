@@ -10,6 +10,7 @@ use reflex::execution;
 use reflex::telemetry;
 use reflex::sim;
 use reflex::db;
+use reflex::ingest;
 
 // Proto imports via lib
 // use reflex::reflex_proto;
@@ -44,6 +45,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let ilp_host = std::env::var("QUESTDB_HOST").unwrap_or_else(|_| "localhost".to_string());
     let ilp_port = std::env::var("QUESTDB_ILP_PORT").unwrap_or_else(|_| "9009".to_string());
     let ilp_addr = format!("{}:{}", ilp_host, ilp_port);
+
+    // --- Directive-69: Genesis Orchestrator ---
+    let orchestrator = reflex::governor::supervise::GenesisOrchestrator::new();
+    if !orchestrator.orchestrate().await {
+        error!("Genesis Aborted. Check Logs.");
+        // In Prod: return Err("Genesis Failed".into());
+        // In Dev: We warn but might proceed if overriding
+    }
 
     // --- Directive-21: Audit Bridge ---
     println!("Connecting to QuestDB ILP at {} and SQL at {}...", ilp_addr, sql_host);
@@ -214,7 +223,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Channel for Decisions (Intent)
     let (decay_tx, decay_rx) = tokio::sync::mpsc::channel(1024);
     // Channel for Fills (Reality)
-    let (decay_fill_tx, decay_fill_rx) = tokio::sync::mpsc::channel(1024);
+    let (_decay_fill_tx, decay_fill_rx) = tokio::sync::mpsc::channel(1024);
 
     tokio::spawn(async move {
         // Run Decay Actor
@@ -253,10 +262,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Components
     let mut market = market::MarketData::new();
     let mut feynman = feynman::PhysicsEngine::new(2000);
-    let _ledger = ledger::AccountState::new(50000.0, 0.0);
+    let mut _ledger = ledger::AccountState::new(50000.0, 0.0);
     let _taleb = taleb::RiskGuardian::new();
     let mut simons = simons::EchoStateNetwork::new(100);
     let _execution = execution::actor::ExecutionAdapter::new();
+    // Directive-64: Safety Staircase (Real Instance)
+    let mut staircase_governor = reflex::governor::staircase::Staircase::new();
     println!("Components Initialized.");
 
     // Spawn Simulation Loop
@@ -268,31 +279,92 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut now_ms = 0.0;
 
     // --- Metrics Setup ---
-    // --- Metrics Setup ---
     let meter = opentelemetry::global::meter("reflex_engine");
     let metrics = telemetry::metrics::EngineMetrics::new(&meter);
     let kv = [opentelemetry::KeyValue::new("mode", "simulation")];
 
+    // --- Directive-72: Ingestion Spawning ---
+    let (ingest_tx, mut ingest_rx) = tokio::sync::mpsc::channel(100);
+    let is_sim_mode_flag = false; 
+
+    if !is_sim_mode_flag {
+        println!("🚀 LIVE MODE: Connecting to Kraken Ingestion...");
+        tokio::spawn(async move {
+            ingest::kraken::connect_kraken("XBT/USD", ingest_tx).await;
+        });
+    }
+
+    // --- Directive-72: Account Sync Channel ---
+    let (balance_tx, mut balance_rx) = tokio::sync::mpsc::channel(10);
+    if !is_sim_mode_flag {
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            
+            let key = std::env::var("KRAKEN_API_KEY").unwrap_or_default();
+            let secret = std::env::var("KRAKEN_API_SECRET").unwrap_or_default();
+            
+            if key.is_empty() {
+                warn!("⚠️ KRAKEN KEYS MISSING. Account Sync Disabled.");
+                return;
+            }
+
+            loop {
+                let result = ingest::kraken::fetch_account_balance(&key, &secret)
+                    .await
+                    .map_err(|e| e.to_string());
+                match result {
+                    Ok((usd, btc)) => {
+                        let _ = balance_tx.send((usd, btc)).await;
+                    },
+                    Err(e) => {
+                        error!("❌ Account Sync Failed: {}", e);
+                    }
+                }
+                tokio::time::sleep(Duration::from_secs(60)).await;
+            }
+        });
+    }
+
+    // --- Directive-66: Audit Loop (Real Instance) ---
+    let mut audit_loop = reflex::governor::audit_loop::AuditLoop::new();
+
     loop {
         let loop_start = Instant::now();
-        now_ms += 100.0; // 100ms ticks
+        now_ms += 100.0;
         
+        // --- Directive-72: Consume Account Updates ---
+        if let Ok((usd, btc)) = balance_rx.try_recv() {
+             _ledger.sync(usd, btc, 0.0);
+             info!("🏦 Ledger Synced: USD=${:.2} BTC={:.8}", usd, btc);
+        }
+
         let span = tracing::info_span!("ooda_tick", tick_ms = now_ms);
         let _enter = span.enter();
 
-        // Simulate Sine Wave Market
-        // Period = 50 ticks (5 seconds)
-        let phase = (now_ms / 1000.0) * std::f64::consts::PI; 
-        let signal = phase.sin() * 5.0;
-        let noise = (rand::random::<f64>() - 0.5) * 2.0;
+        // --- Directive-72: LIVE DATA ORIGIN ---
+        let price = if is_sim_mode_flag {
+             let phase = (now_ms / 1000.0) * std::f64::consts::PI; 
+             let signal = phase.sin() * 5.0;
+             let noise = (rand::random::<f64>() - 0.5) * 2.0;
+             let spike = if now_ms > 5000.0 && now_ms < 5500.0 { 10.0 } else { 0.0 };
+             100.0 + signal + noise + spike
+        } else {
+             match tokio::time::timeout(Duration::from_millis(100), ingest_rx.recv()).await {
+                 Ok(Some(tick)) => {
+                     now_ms = tick.timestamp as f64;
+                     tick.price
+                 },
+                 Ok(None) => {
+                     error!("❌ Ingestion Channel Closed!");
+                     break; 
+                 },
+                 Err(_) => {
+                     now_ms += 100.0;
+                     market.price 
+                 }
+             }
+        };
         
-        // Spike Injection at tick 50 (~5s)
-        let spike = if now_ms > 5000.0 && now_ms < 5500.0 { 10.0 } else { 0.0 };
-
-        let price = 100.0 + signal + noise + spike;
-        
-        // --- Metrics Heartbeat ---
-        // --- Metrics Heartbeat ---
         metrics.heartbeat.add(1, &kv);
         metrics.market_price.record(price, &kv);
         
@@ -301,19 +373,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         metrics.market_velocity.record(state.velocity, &kv);
         
         // --- D-50: OODA Execution ---
-        // 1. Orient
         let ooda_state = ooda.orient(state.clone(), client_clone.as_mut()).await;
-        // 2. Decide (Logs Forensics automatically)
         let _decision = ooda.decide(&ooda_state);
 
         // Update Shared State (For API)
         if let Ok(mut w) = shared_state.write() {
             w.physics = state.clone(); 
             w.ooda = Some(ooda_state.clone());
-            // Check Veto
+            
+            // Directive-72: Update Account Link
+            let current_equity = _ledger.total_equity(market.price);
+            w.account.equity = current_equity;
+            w.account.balance = _ledger.available_balance();
+            w.account.unrealized_pnl = current_equity - _ledger.start_of_day_balance;
+            
+            // Directive-72: Brain Telemetry (Updated below if connected)
+            // Default/Fallback values
+            // w.gemma.tokens_per_sec = 0.0; // Set via Brain response if available
+            // w.gemma.latency_ms = 0.0;     
+            
+            // Directive-64: Update Governance Link
+            w.governance.staircase_tier = staircase_governor.tier();
+            w.governance.staircase_progress = staircase_governor.progress();
+            w.governance.audit_drift = audit_loop.drift_score;
+
+            // Check Veto (Directive-68 & 72)
             if w.veto_active {
-                // In real implementation, this would trigger a halt
-                // For now, we just observe
+                tracing::warn!("⛔ VETO ACTIVE (Origin Guard/Kill Switch). Suspending Execution Loop.");
+                tokio::time::sleep(tick_rate * 10).await; // Slow down loop significantly
+                continue; // Skip Brain Logic & Execution
             }
         }
 
@@ -346,6 +434,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         if let Some(client) = &mut client_clone {
                 // Throttle requests to 2Hz (every 500ms)
                 if last_processed_yield.elapsed() > Duration::from_millis(500) {
+                     let rtt_start = Instant::now(); // Measure Latency
                      match client.reason(
                          market.price,
                          state.velocity,
@@ -354,6 +443,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                          simons_pred
                      ).await {
                          Ok(intent) => {
+                             let latency_ms = rtt_start.elapsed().as_millis() as f64;
+                             
+                             // Update Telemetry with Real Latency
+                             if let Ok(mut w) = shared_state.write() {
+                                 w.gemma.latency_ms = latency_ms;
+                                 w.gemma.tokens_per_sec = 0.0; // Requires proto update for real value
+                             }
+
                              // Map Protobuf Intent to Taleb TradeProposal
                              let proposal = taleb::TradeProposal {
                                  side: intent.action.clone(),

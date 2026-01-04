@@ -17,11 +17,34 @@ use crate::governor::ooda_loop::OODAState;
 
 // --- Shared State ---
 // This is the "Brain Stem" - shared between the hot loop and the API
+#[derive(Debug, Clone, Default)]
+pub struct AccountSnapshot {
+    pub unrealized_pnl: f64,
+    pub equity: f64,
+    pub balance: f64,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct ModelMetrics {
+    pub tokens_per_sec: f64,
+    pub latency_ms: f64,
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct GovernanceState {
+    pub staircase_tier: i32,
+    pub staircase_progress: f64,
+    pub audit_drift: f64,
+}
+
 #[derive(Debug, Clone)]
 pub struct SharedState {
     pub physics: PhysicsState,
     pub ooda: Option<OODAState>,
     pub veto_active: bool,
+    pub account: AccountSnapshot,
+    pub gemma: ModelMetrics,
+    pub governance: GovernanceState,
 }
 
 impl Default for SharedState {
@@ -30,6 +53,9 @@ impl Default for SharedState {
             physics: PhysicsState::default(),
             ooda: None,
             veto_active: false,
+            account: AccountSnapshot::default(),
+            gemma: ModelMetrics::default(),
+            governance: GovernanceState::default(),
         }
     }
 }
@@ -51,6 +77,7 @@ struct KineticHUD {
 #[derive(Debug)]
 pub struct ReflexServerImpl {
     pub state: SafeState,
+    pub tx: broadcast::Sender<SharedState>,
 }
 
 #[tonic::async_trait]
@@ -66,6 +93,17 @@ impl ReflexService for ReflexServerImpl {
             entropy: r.physics.entropy,
             efficiency_index: r.physics.efficiency_index,
             timestamp: r.physics.timestamp,
+            // Account
+            unrealized_pnl: r.account.unrealized_pnl,
+            equity: r.account.equity,
+            balance: r.account.balance,
+            // Model
+            gemma_tokens_per_sec: r.gemma.tokens_per_sec,
+            gemma_latency_ms: r.gemma.latency_ms,
+            // Governance
+            staircase_tier: r.governance.staircase_tier,
+            staircase_progress: r.governance.staircase_progress,
+            audit_drift: r.governance.audit_drift,
         }))
     }
 
@@ -74,7 +112,7 @@ impl ReflexService for ReflexServerImpl {
         
         if let Some(ooda) = &r.ooda {
              Ok(Response::new(OodaResponse {
-                physics: Some(PhysicsResponse {
+                 physics: Some(PhysicsResponse {
                     price: ooda.physics.price,
                     velocity: ooda.physics.velocity,
                     acceleration: ooda.physics.acceleration,
@@ -82,6 +120,17 @@ impl ReflexService for ReflexServerImpl {
                     entropy: ooda.physics.entropy,
                     efficiency_index: ooda.physics.efficiency_index,
                     timestamp: ooda.physics.timestamp,
+                    // Account
+                    unrealized_pnl: r.account.unrealized_pnl,
+                    equity: r.account.equity,
+                    balance: r.account.balance,
+                    // Model
+                    gemma_tokens_per_sec: r.gemma.tokens_per_sec,
+                    gemma_latency_ms: r.gemma.latency_ms,
+                    // Governance
+                    staircase_tier: r.governance.staircase_tier,
+                    staircase_progress: r.governance.staircase_progress,
+                    audit_drift: r.governance.audit_drift,
                 }),
                 sentiment_score: ooda.sentiment_score,
                 nearest_regime: ooda.nearest_regime.as_ref().map(|s| s.clone()),
@@ -135,9 +184,66 @@ impl ReflexService for ReflexServerImpl {
     async fn update_config(&self, _req: Request<ConfigPayload>) -> Result<Response<Ack>, Status> {
         Ok(Response::new(Ack { success: true, message: "Legacy stub".into() }))
     }
-    type GetStreamStream = tokio_stream::wrappers::ReceiverStream<Result<Heartbeat, Status>>;
-    async fn get_stream(&self, _req: Request<Empty>) -> Result<Response<Self::GetStreamStream>, Status> {
-        Err(Status::unimplemented("Use WebSocket /ws instead"))
+    type GetStreamStream = std::pin::Pin<Box<dyn tokio_stream::Stream<Item = Result<PhysicsResponse, Status>> + Send + Sync + 'static>>;
+
+    async fn get_stream(&self, request: Request<Empty>) -> Result<Response<Self::GetStreamStream>, Status> {
+        // --- Directive-72: Origin Guard (The Real-World Handshake) ---
+        let metadata = request.metadata();
+        let origin = metadata.get("x-data-origin").and_then(|v| v.to_str().ok()).unwrap_or("UNKNOWN");
+        let run_mode = std::env::var("RUN_MODE").unwrap_or_else(|_| "SIM".to_string());
+        
+        let origin_mismatch = match (run_mode.as_str(), origin) {
+            ("LIVE", "SIM") => true,
+            ("SIM", "LIVE") => true,
+            _ => false
+        };
+
+        if origin_mismatch {
+            tracing::error!("🚨 ORIGIN GUARD VIOLATION: Mode={} vs Origin={}. TRIGGERING VETO.", run_mode, origin);
+            if let Ok(mut w) = self.state.write() {
+                w.veto_active = true;
+            }
+            return Err(Status::permission_denied("Origin Mismatch: Hard Veto Triggered"));
+        }
+
+        tracing::info!("📺 Stream Requested. Origin: {} | Server Mode: {}", origin, run_mode);
+
+        let rx = self.tx.subscribe();
+        
+        // Convert broadcast stream to gRPC stream
+        let stream = tokio_stream::wrappers::BroadcastStream::new(rx)
+            .map(move |res| {
+                match res {
+                    Ok(state) => {
+                        Ok(PhysicsResponse {
+                            price: state.physics.price,
+                            velocity: state.physics.velocity,
+                            acceleration: state.physics.acceleration,
+                            jerk: state.physics.jerk,
+                            entropy: state.physics.entropy,
+                            efficiency_index: state.physics.efficiency_index,
+                            timestamp: state.physics.timestamp,
+                            
+                            // Account
+                            unrealized_pnl: state.account.unrealized_pnl,
+                            equity: state.account.equity,
+                            balance: state.account.balance,
+
+                            // Model
+                            gemma_tokens_per_sec: state.gemma.tokens_per_sec,
+                            gemma_latency_ms: state.gemma.latency_ms,
+                            
+                            // Governance
+                            staircase_tier: state.governance.staircase_tier,
+                            staircase_progress: state.governance.staircase_progress,
+                            audit_drift: state.governance.audit_drift,
+                        })
+                    },
+                    Err(_) => Err(Status::internal("Lagged")),
+                }
+            });
+
+        Ok(Response::new(Box::pin(stream) as Self::GetStreamStream))
     }
 }
 
@@ -148,8 +254,12 @@ pub async fn run_server(
 ) {
     // 1. gRPC Server
     let grpc_state = state.clone();
-    let grpc_addr = "[::1]:50051".parse().unwrap();
-    let reflex_service = crate::reflex_proto::reflex_service_server::ReflexServiceServer::new(ReflexServerImpl { state: grpc_state });
+    let grpc_tx = tx.clone();
+    let grpc_addr = "0.0.0.0:50051".parse().unwrap();
+    let reflex_service = crate::reflex_proto::reflex_service_server::ReflexServiceServer::new(ReflexServerImpl { 
+        state: grpc_state,
+        tx: grpc_tx 
+    });
 
     tracing::info!("🚀 API Surface (gRPC) listening on {}", grpc_addr);
     

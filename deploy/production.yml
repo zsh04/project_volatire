@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  reflex:
+    image: voltaire-reflex:latest
+    build:
+      context: ./src/reflex
+      dockerfile: Dockerfile
+    environment:
+      - DATABASE_URL=postgresql://admin:quest@questdb:8812/qdb
+      - QUESTDB_HOST=questdb
+      - QUESTDB_ILP_PORT=9009
+      - RUST_LOG=info
+    deploy:
+      resources:
+        limits:
+          cpus: '2.00'
+          memory: 4G
+    depends_on:
+      questdb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - voltaire-net
+
+  brain:
+    image: voltaire-brain:latest
+    build:
+      context: ./src/brain
+      dockerfile: Dockerfile
+    environment:
+      - MODEL_Precision=FP16
+    networks:
+      - voltaire-net
+
+  questdb:
+    image: questdb/questdb:latest
+    ports:
+      - "9000:9000"
+      - "9009:9009"
+      - "8812:8812"
+    environment:
+      - QDB_CAIRO_COMMIT_LAG=1000
+      - QDB_CAIRO_MAX_UNCOMMITTED_ROWS=100000
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/status"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - voltaire-net
+
+  redis:
+    image: docker.dragonflydb.io/dragonflydb/dragonfly
+    ulimits:
+      memlock: -1
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - voltaire-net
+
+  interface:
+    image: voltaire-interface:latest
+    build:
+      context: ./src/interface
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    depends_on:
+      - reflex
+    networks:
+      - voltaire-net
+
+networks:
+  voltaire-net:
+    driver: bridge

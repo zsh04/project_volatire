@@ -74,7 +74,7 @@ impl OODACore {
     /// Implements "Jitter" Fallback: If Semantics take too long, we proceed with Safety.
     #[tracing::instrument(skip(self, client))]
     pub async fn orient(&mut self, physics: PhysicsState, client: Option<&mut BrainClient>) -> OODAState {
-        let start = Instant::now();
+        let _start = Instant::now();
         
         // Capture TraceID from current span
         let span = tracing::Span::current();
