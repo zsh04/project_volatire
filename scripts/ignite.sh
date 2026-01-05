@@ -6,7 +6,25 @@ set -e
 
 echo "🚀 Initiating Voltaire Ignition Sequence..."
 
-# 0. Pre-Flight Check: Model Health
+# 0. Infrastructure (DBs)
+echo "🏗️  Starting Infrastructure (QuestDB + Dragonfly)..."
+docker-compose -f infra/docker-compose.yml up -d
+sleep 2
+
+# 0.2. Start Ollama (LLM Service)
+echo "🦙 Checking Ollama Service..."
+if ! pgrep -x "ollama" > /dev/null; then
+    echo "   > Starting Ollama Serve..."
+    nohup ollama serve > ollama.log 2>&1 &
+    sleep 5
+else
+    echo "   ✅ Ollama is already running."
+fi
+
+# Set Model Env for Brain
+export OLLAMA_MODEL="gemma2:9b-instruct-q4_K_M"
+
+# 0.5. Model Health Check
 echo "🔍 Checking AI Subsystems..."
 cd src/brain && poetry run python check_models.py
 if [ $? -eq 0 ]; then
