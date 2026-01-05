@@ -49,4 +49,73 @@
   .text-glow-red {
     text-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
   }
+
+  /* Directive-UX: Fidelity Halo */
+  .fidelity-halo-laminar {
+    box-shadow: inset 0 0 20px rgba(0, 255, 65, 0.1);
+    border: 1px solid rgba(0, 255, 65, 0.2);
+  }
+
+  .fidelity-halo-degraded {
+    box-shadow: inset 0 0 30px rgba(255, 170, 0, 0.2);
+    border: 1px solid rgba(255, 170, 0, 0.4);
+    animation: halo-pulse-amber 3s infinite;
+  }
+
+  .fidelity-halo-critical {
+    box-shadow: inset 0 0 50px rgba(255, 0, 85, 0.3);
+    border: 2px solid rgba(255, 0, 85, 0.6);
+    animation: halo-pulse-red 1s infinite;
+  }
+
+  /* Directive-UX: Regime Backgrounds */
+  .regime-laminar {
+    background: radial-gradient(circle at 50% 50%, #1a1a1a 0%, #000000 100%);
+  }
+
+  .regime-decoherence {
+    background: radial-gradient(circle at 50% 50%, #2a2a2a 0%, #050505 100%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .regime-decoherence::before {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.25) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.06), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.06));
+    background-size: 100% 2px, 3px 100%;
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* CRT Scanline Effect */
+  .scanlines {
+    background: linear-gradient(to bottom, rgba(255,255,255,0), rgba(255,255,255,0) 50%, rgba(0,0,0,0.2) 50%, rgba(0,0,0,0.2));
+    background-size: 100% 4px;
+    animation: scanline 10s linear infinite;
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    z-index: 50;
+    opacity: 0.3;
+  }
+
+  @keyframes halo-pulse-amber {
+    0%, 100% { box-shadow: inset 0 0 30px rgba(255, 170, 0, 0.2); border-color: rgba(255, 170, 0, 0.4); }
+    50% { box-shadow: inset 0 0 50px rgba(255, 170, 0, 0.4); border-color: rgba(255, 170, 0, 0.8); }
+  }
+
+  @keyframes halo-pulse-red {
+    0%, 100% { box-shadow: inset 0 0 50px rgba(255, 0, 85, 0.3); border-color: rgba(255, 0, 85, 0.6); }
+    50% { box-shadow: inset 0 0 80px rgba(255, 0, 85, 0.6); border-color: rgba(255, 0, 85, 1); }
+  }
+
+  @keyframes scanline {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 100%; }
+  }
 }

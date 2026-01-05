@@ -24,6 +24,9 @@ export class PhysicsResponse extends jspb.Message {
   getTimestamp(): number;
   setTimestamp(value: number): PhysicsResponse;
 
+  getSequenceId(): number;
+  setSequenceId(value: number): PhysicsResponse;
+
   getUnrealizedPnl(): number;
   setUnrealizedPnl(value: number): PhysicsResponse;
 
@@ -48,6 +51,26 @@ export class PhysicsResponse extends jspb.Message {
   getAuditDrift(): number;
   setAuditDrift(value: number): PhysicsResponse;
 
+  getSystemLatencyUs(): number;
+  setSystemLatencyUs(value: number): PhysicsResponse;
+
+  getSystemJitterUs(): number;
+  setSystemJitterUs(value: number): PhysicsResponse;
+
+  getVitalityStatus(): string;
+  setVitalityStatus(value: string): PhysicsResponse;
+
+  getReasoningTraceList(): Array<ReasoningStep>;
+  setReasoningTraceList(value: Array<ReasoningStep>): PhysicsResponse;
+  clearReasoningTraceList(): PhysicsResponse;
+  addReasoningTrace(value?: ReasoningStep, index?: number): ReasoningStep;
+
+  getIgnitionStatus(): string;
+  setIgnitionStatus(value: string): PhysicsResponse;
+
+  getSystemSanityScore(): number;
+  setSystemSanityScore(value: number): PhysicsResponse;
+
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): PhysicsResponse.AsObject;
   static toObject(includeInstance: boolean, msg: PhysicsResponse): PhysicsResponse.AsObject;
@@ -65,6 +88,7 @@ export namespace PhysicsResponse {
     entropy: number,
     efficiencyIndex: number,
     timestamp: number,
+    sequenceId: number,
     unrealizedPnl: number,
     equity: number,
     balance: number,
@@ -73,6 +97,46 @@ export namespace PhysicsResponse {
     staircaseTier: number,
     staircaseProgress: number,
     auditDrift: number,
+    systemLatencyUs: number,
+    systemJitterUs: number,
+    vitalityStatus: string,
+    reasoningTraceList: Array<ReasoningStep.AsObject>,
+    ignitionStatus: string,
+    systemSanityScore: number,
+  }
+}
+
+export class ReasoningStep extends jspb.Message {
+  getId(): string;
+  setId(value: string): ReasoningStep;
+
+  getContent(): string;
+  setContent(value: string): ReasoningStep;
+
+  getProbability(): number;
+  setProbability(value: number): ReasoningStep;
+
+  getType(): string;
+  setType(value: string): ReasoningStep;
+
+  getTimestamp(): number;
+  setTimestamp(value: number): ReasoningStep;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): ReasoningStep.AsObject;
+  static toObject(includeInstance: boolean, msg: ReasoningStep): ReasoningStep.AsObject;
+  static serializeBinaryToWriter(message: ReasoningStep, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): ReasoningStep;
+  static deserializeBinaryFromReader(message: ReasoningStep, reader: jspb.BinaryReader): ReasoningStep;
+}
+
+export namespace ReasoningStep {
+  export type AsObject = {
+    id: string,
+    content: string,
+    probability: number,
+    type: string,
+    timestamp: number,
   }
 }
 

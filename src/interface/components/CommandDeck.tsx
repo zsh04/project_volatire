@@ -1,41 +1,71 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
+import { motion, useMotionValue, useTransform, useDragControls } from 'framer-motion';
 import { sendSovereignCommand, SovereignCommand, confirmCommand } from '@/lib/governance';
 import { useSystemStore } from '@/lib/stores/system-store';
 import { useNullification } from '../src/hooks/useNullification';
+import { AlertOctagon, PauseCircle, PlayCircle, ShieldBan, XCircle, Activity } from 'lucide-react';
 
 /**
- * Directive-86: Command Deck
- * High-priority command interface for pilot strategic oversight
- * Updated for D-90: System Sanity Score
+ * Directive-UX: Sovereign Command Deck
+ * 
+ * Re-Architected for "Action Oriented" UX.
+ * Features:
+ * - Swipe-to-Kill (prevents accidental trigger)
+ * - Vitality Halo Feedback
+ * - Compact "Glass Cockpit" aesthetic
  */
+
 export function CommandDeck() {
   const [isPaused, setIsPaused] = useState(false);
-  const [sentimentOverride, setSentimentOverride] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // D-90: Sanity Score & D-88: Nullification
+  // D-90 & D-88
   const systemSanityScore = useSystemStore((state) => state.systemSanityScore);
   const { isNullified } = useNullification();
 
+  // Swipe Logic
+  const dragControls = useDragControls();
+  const x = useMotionValue(0);
+  const widthRef = useRef<HTMLDivElement>(null);
+
+  // Slide Transforms
+  const background = useTransform(
+    x,
+    [-200, 0, 200],
+    ['rgba(255, 170, 0, 0.2)', 'rgba(0, 0, 0, 0.8)', 'rgba(255, 0, 85, 0.2)']
+  );
+  const borderColor = useTransform(
+    x,
+    [-200, 0, 200],
+    ['#ffaa00', '#333', '#ff0055']
+  );
+
   const handleCommand = async (command: SovereignCommand, payload?: number) => {
     if (isProcessing) return;
-
-    // Request confirmation for dangerous commands
-    if (![SovereignCommand.RESUME, SovereignCommand.CLEAR_SENTIMENT_OVERRIDE].includes(command)) {
-      if (!confirmCommand(command)) {
-        return;
-      }
-    }
-
     setIsProcessing(true);
     try {
+      if (command === SovereignCommand.KILL) {
+        console.warn("💀 KILL SWITCH ACTIVATED VIA SWIPE");
+      }
       const response = await sendSovereignCommand(command, payload);
       console.log(`✓ ${command} executed in ${response.latency_ms}ms`);
     } catch (error) {
       console.error(`✗ ${command} failed:`, error);
-      alert(`Command failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const onDragEnd = async (_: any, info: any) => {
+    const offset = info.offset.x;
+    if (offset > 150) {
+      // Swipe Right -> KILL
+      if (confirmCommand(SovereignCommand.KILL)) {
+        await handleCommand(SovereignCommand.KILL);
+      }
+    } else if (offset < -150) {
+      // Swipe Left -> VETO
+      await handleCommand(SovereignCommand.VETO);
     }
   };
 
@@ -45,292 +75,72 @@ export function CommandDeck() {
     setIsPaused(!isPaused);
   };
 
-  const handleKill = async () => {
-    await handleCommand(SovereignCommand.KILL);
-  };
-
-  const handleVeto = async () => {
-    await handleCommand(SovereignCommand.VETO);
-  };
-
-  const handleCloseAll = async () => {
-    await handleCommand(SovereignCommand.CLOSE_ALL);
-  };
-
-  const handleSentimentSlider = async (value: number) => {
-    setSentimentOverride(value);
-    await handleCommand(SovereignCommand.SET_SENTIMENT_OVERRIDE, value);
-  };
-
-  const handleClearSentiment = async () => {
-    setSentimentOverride(null);
-    await handleCommand(SovereignCommand.CLEAR_SENTIMENT_OVERRIDE);
-  };
-
   return (
-    <div className={`command-deck ${isNullified ? 'nullified' : ''}`}>
-      <style jsx>{`
-        .command-deck {
-          position: fixed;
-          bottom: 20px;
-          right: 20px;
-          background: rgba(0, 0, 0, 0.9);
-          border: 2px solid #00ff41;
-          border-radius: 8px;
-          padding: 16px;
-          min-width: 320px;
-          box-shadow: 0 0 20px rgba(0, 255, 65, 0.3);
-          font-family: 'JetBrains Mono', monospace;
-          z-index: 1000;
-          transition: border-color 0.3s;
-        }
-
-        .command-deck.nullified {
-            border-color: #555;
-            opacity: 0.7;
-        }
-
-        .deck-header {
-          font-size: 12px;
-          font-weight: bold;
-          color: #00ff41;
-          margin-bottom: 12px;
-          display: flex;
-          justify-content: space-between;
-          text-transform: uppercase;
-          letter-spacing: 1px;
-          border-bottom: 1px solid rgba(0, 255, 65, 0.3);
-          padding-bottom: 8px;
-        }
-
-        .sanity-score {
-            font-size: 10px;
-            padding: 2px 6px;
-            border-radius: 4px;
-            background: #111;
-            color: ${systemSanityScore > 0.8 ? '#00ff41' : systemSanityScore > 0.5 ? '#ffaa00' : '#ff0055'};
-            border: 1px solid ${systemSanityScore > 0.8 ? '#00ff41' : systemSanityScore > 0.5 ? '#ffaa00' : '#ff0055'};
-        }
-
-        .control-section {
-          margin-bottom: 16px;
-        }
-
-        .control-label {
-          font-size: 10px;
-          color: #00ff41;
-          margin-bottom: 4px;
-          opacity: 0.8;
-        }
-
-        .btn {
-          width: 100%;
-          padding: 10px 16px;
-          font-size: 13px;
-          font-weight: bold;
-          font-family: 'JetBrains Mono', monospace;
-          border: none;
-          border-radius: 4px;
-          cursor: pointer;
-          transition: all 0.2s;
-          text-transform: uppercase;
-          letter-spacing: 0.5px;
-        }
-
-        .btn:disabled {
-          opacity: 0.5;
-          cursor: not-allowed;
-        }
-
-        .btn-pause {
-          background: ${isPaused ? '#00ff41' : '#1a1a1a'};
-          color: ${isPaused ? '#000' : '#00ff41'};
-          border: 2px solid #00ff41;
-          margin-bottom: 8px;
-        }
-
-        .btn-pause:hover:not(:disabled) {
-          background: #00ff41;
-          color: #000;
-          box-shadow: 0 0 10px rgba(0, 255, 65, 0.5);
-        }
-
-        .btn-critical {
-          background: #1a1a1a;
-          color: #ff0055;
-          border: 2px solid #ff0055;
-          margin-bottom: 4px;
-        }
-
-        .btn-critical:hover:not(:disabled) {
-          background: #ff0055;
-          color: #000;
-          box-shadow: 0 0 10px rgba(255, 0, 85, 0.5);
-        }
-
-        .btn-veto {
-          background: #1a1a1a;
-          color: #ffaa00;
-          border: 2px solid #ffaa00;
-          margin-bottom: 8px;
-        }
-
-        .btn-veto:hover:not(:disabled) {
-          background: #ffaa00;
-          color: #000;
-          box-shadow: 0 0 10px rgba(255, 170, 0, 0.5);
-        }
-
-        .sentiment-control {
-          background: rgba(0, 255, 65, 0.05);
-          padding: 12px;
-          border-radius: 4px;
-          border: 1px solid rgba(0, 255, 65, 0.2);
-        }
-
-        .sentiment-value
- {
-          font-size: 14px;
-          color: #00ff41;
-          margin-bottom: 8px;
-          text-align: center;
-          font-weight: bold;
-        }
-
-        .slider {
-          width: 100%;
-          height: 4px;
-          border-radius: 2px;
-          background: rgba(0, 255, 65, 0.2);
-          outline: none;
-          -webkit-appearance: none;
-        }
-
-        .slider::-webkit-slider-thumb {
-          -webkit-appearance: none;
-          appearance: none;
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: #00ff41;
-          cursor: pointer;
-          box-shadow: 0 0 5px rgba(0, 255, 65, 0.5);
-        }
-
-        .slider::-moz-range-thumb {
-          width: 16px;
-          height: 16px;
-          border-radius: 50%;
-          background: #00ff41;
-          cursor: pointer;
-          border: none;
-        }
-
-        .btn-clear {
-          margin-top: 8px;
-          padding: 6px;
-          font-size: 10px;
-          background: transparent;
-          color: #00ff41;
-          border: 1px solid rgba(0, 255, 65, 0.3);
-        }
-
-        .btn-clear:hover:not(:disabled) {
-          background: rgba(0, 255, 65, 0.1);
-        }
-
-        .status-indicator {
-          margin-top: 12px;
-          padding: 8px;
-          border-radius: 4px;
-          font-size: 10px;
-          text-align: center;
-          background: ${isPaused ? 'rgba(255, 170, 0, 0.1)' : 'rgba(0, 255, 65, 0.1)'};
-          color: ${isPaused ? '#ffaa00' : '#00ff41'};
-          border: 1px solid ${isPaused ? 'rgba(255, 170, 0, 0.3)' : 'rgba(0, 255, 65, 0.3)'};
-        }
-      `}</style>
-
-      <div className="deck-header">
-        <span>⚡ Command</span>
-        <span className="sanity-score" title="Fidelity Multiplier (Risk Adjustment)">
-          ξ {(systemSanityScore * 100).toFixed(0)}%
-        </span>
-      </div>
-
-      {/* Tactical Pause */}
-      <div className="control-section">
-        <div className="control-label">Tactical State</div>
+    <motion.div
+      className={`fixed bottom-0 left-0 right-0 h-24 backdrop-blur-md border-t border-white/10 z-50 flex items-center justify-between px-8 transition-colors duration-300 ${isNullified ? 'grayscale opacity-50' : ''}`}
+      style={{ background, borderTopColor: borderColor }}
+    >
+      {/* LEFT: Tactical Controls */}
+      <div className="flex items-center gap-4">
         <button
-          className="btn btn-pause"
           onClick={handlePause}
           disabled={isProcessing}
+          className={`flex items-center gap-2 px-4 py-2 rounded-full border border-white/20 hover:border-white/50 transition-all ${isPaused ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}`}
         >
-          {isPaused ? '▶️ Resume Trading' : '⏸️ Tactical Pause'}
+          {isPaused ? <PlayCircle size={18} /> : <PauseCircle size={18} />}
+          <span className="text-xs font-mono font-bold tracking-widest uppercase">
+            {isPaused ? 'RESUME' : 'PAUSE'}
+          </span>
         </button>
-      </div>
 
-      {/* Action Buttons */}
-      <div className="control-section">
-        <div className="control-label">Emergency Controls</div>
-        <button
-          className="btn btn-critical"
-          onClick={handleKill}
-          disabled={isProcessing}
-        >
-          🛑 Kill All
-        </button>
-        <button
-          className="btn btn-critical"
-          onClick={handleCloseAll}
-          disabled={isProcessing}
-        >
-          📛 Close All Positions
-        </button>
-        <button
-          className="btn btn-veto"
-          onClick={handleVeto}
-          disabled={isProcessing}
-        >
-          ⛔ Veto Next Trade
-        </button>
-      </div>
+        <div className="h-8 w-px bg-white/10 mx-2" />
 
-      {/* Sentiment Override */}
-      <div className="control-section">
-        <div className="control-label">Sentiment Override</div>
-        <div className="sentiment-control">
-          <div className="sentiment-value">
-            {sentimentOverride !== null
-              ? `Manual: ${sentimentOverride.toFixed(1)}`
-              : 'Auto (Hypatia)'}
+        <div className="flex flex-col">
+          <span className="text-[10px] text-white/40 font-mono tracking-wider uppercase">System Sanity</span>
+          <div className="flex items-center gap-2">
+            <Activity size={14} className={systemSanityScore > 0.8 ? 'text-emerald-400' : 'text-red-500'} />
+            <span className={`text-sm font-mono font-bold ${systemSanityScore > 0.8 ? 'text-emerald-400' : 'text-red-500'}`}>
+              {(systemSanityScore * 100).toFixed(0)}%
+            </span>
           </div>
-          <input
-            type="range"
-            min="0"
-            max="1"
-            step="0.1"
-            value={sentimentOverride ?? 0.5}
-            onChange={(e) => handleSentimentSlider(parseFloat(e.target.value))}
-            className="slider"
-            disabled={isProcessing}
-          />
-          {sentimentOverride !== null && (
-            <button
-              className="btn btn-clear"
-              onClick={handleClearSentiment}
-              disabled={isProcessing}
-            >
-              Clear Override
-            </button>
-          )}
         </div>
       </div>
 
-      {/* Status Indicator */}
-      <div className="status-indicator">
-        {isNullified ? '⚠️ AUDITOR RECALIBRATING (NULLIFIED)' : (isPaused ? '⏸️ TACTICAL PAUSE ACTIVE' : '▶️ AUTONOMOUS MODE')}
+      {/* CENTER: Swipe-to-Kill Slider */}
+      <div className="relative w-[400px] h-12 bg-black/40 rounded-full border border-white/10 overflow-hidden flex items-center justify-center" ref={widthRef}>
+        <div className="absolute inset-0 flex items-center justify-between px-6 pointer-events-none opacity-40">
+          <span className="text-[10px] font-mono text-amber-500 tracking-widest">{'< VETO'}</span>
+          <span className="text-[10px] font-mono text-red-500 tracking-widest">{'KILL >'}</span>
+        </div>
+
+        <motion.div
+          drag="x"
+          dragConstraints={{ left: -180, right: 180 }} // Constrained within pill
+          dragElastic={0.1}
+          dragControls={dragControls}
+          onDragEnd={onDragEnd}
+          style={{ x }}
+          className="w-16 h-10 bg-white/10 backdrop-blur-lg rounded-full border border-white/30 shadow-[0_0_15px_rgba(255,255,255,0.1)] cursor-grab active:cursor-grabbing flex items-center justify-center relative z-10"
+        >
+          <div className="w-1 h-4 bg-white/50 rounded-full" />
+          <div className="w-1 h-4 bg-white/50 rounded-full mx-1" />
+          <div className="w-1 h-4 bg-white/50 rounded-full" />
+        </motion.div>
       </div>
-    </div>
+
+      {/* RIGHT: Status / Override */}
+      <div className="flex items-center gap-4">
+        {/* Close All (Immediate) - Kept as button for rapid liquidation */}
+        <button
+          onClick={() => handleCommand(SovereignCommand.CLOSE_ALL)}
+          disabled={isProcessing}
+          className="flex items-center gap-2 px-4 py-2 rounded-full border border-red-500/30 bg-red-500/5 hover:bg-red-500/20 text-red-400 transition-all"
+        >
+          <XCircle size={16} />
+          <span className="text-xs font-mono font-bold tracking-wider">FLATTEN</span>
+        </button>
+      </div>
+    </motion.div>
   );
 }
+

@@ -369,7 +369,7 @@ self.addEventListener('message', (event: MessageEvent) => {
             mode = 'LIVE';
             break;
         case 'SEEK_SCRUB':
-            seekForensicScrub(payload.timestamp);
+            handleScrubSeek(payload.timestamp);
             break;
         // D-84: Stress Test Controls
         case 'START_SYNTHETIC_TICKS':

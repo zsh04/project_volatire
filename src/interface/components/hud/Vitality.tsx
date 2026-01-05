@@ -3,7 +3,15 @@ import { useSystemStore } from '../../lib/stores/system-store';
 
 const Vitality: React.FC = () => {
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const { vitality, currentRegime } = useSystemStore();
+    const { systemSanityScore, venue, currentRegime } = useSystemStore();
+
+    // Synthesize Vitality from available metrics
+    const vitality = {
+        jitterUs: (1.0 - systemSanityScore) * 500, // Proxy: Lower sanity = higher jitter
+        latencyUs: venue.rtt * 1000, // ms to us
+        status: systemSanityScore > 0.8 ? 'OPTIMAL' : systemSanityScore > 0.5 ? 'DEGRADED' : 'CRITICAL'
+    };
+
 
     // Waveform State
     const [dataPoints, setDataPoints] = useState<number[]>(new Array(100).fill(0));
@@ -71,8 +79,8 @@ const Vitality: React.FC = () => {
             <div className="flex justify-between items-center mb-2">
                 <h3 className="text-xs font-mono text-gray-400 uppercase tracking-widest">Vitality Sentinel</h3>
                 <div className={`px-2 py-0.5 text-[10px] font-bold rounded-sm ${vitality.status === 'OPTIMAL' ? 'bg-green-900/50 text-green-400 border border-green-700/50' :
-                        vitality.status === 'DEGRADED' ? 'bg-yellow-900/50 text-yellow-400 border border-yellow-700/50' :
-                            'bg-red-900/50 text-red-500 border border-red-700/50 animate-pulse'
+                    vitality.status === 'DEGRADED' ? 'bg-yellow-900/50 text-yellow-400 border border-yellow-700/50' :
+                        'bg-red-900/50 text-red-500 border border-red-700/50 animate-pulse'
                     }`}>
                     {vitality.status}
                 </div>

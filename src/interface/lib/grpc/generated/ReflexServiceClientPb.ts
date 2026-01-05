@@ -211,6 +211,49 @@ export class ReflexServiceClient {
     this.methodDescriptorDemoteProvisional);
   }
 
+  methodDescriptorInitiateIgnition = new grpcWeb.MethodDescriptor(
+    '/reflex.ReflexService/InitiateIgnition',
+    grpcWeb.MethodType.UNARY,
+    reflex_pb.Empty,
+    reflex_pb.Ack,
+    (request: reflex_pb.Empty) => {
+      return request.serializeBinary();
+    },
+    reflex_pb.Ack.deserializeBinary
+  );
+
+  initiateIgnition(
+    request: reflex_pb.Empty,
+    metadata?: grpcWeb.Metadata | null): Promise<reflex_pb.Ack>;
+
+  initiateIgnition(
+    request: reflex_pb.Empty,
+    metadata: grpcWeb.Metadata | null,
+    callback: (err: grpcWeb.RpcError,
+               response: reflex_pb.Ack) => void): grpcWeb.ClientReadableStream<reflex_pb.Ack>;
+
+  initiateIgnition(
+    request: reflex_pb.Empty,
+    metadata?: grpcWeb.Metadata | null,
+    callback?: (err: grpcWeb.RpcError,
+               response: reflex_pb.Ack) => void) {
+    if (callback !== undefined) {
+      return this.client_.rpcCall(
+        this.hostname_ +
+          '/reflex.ReflexService/InitiateIgnition',
+        request,
+        metadata || {},
+        this.methodDescriptorInitiateIgnition,
+        callback);
+    }
+    return this.client_.unaryCall(
+    this.hostname_ +
+      '/reflex.ReflexService/InitiateIgnition',
+    request,
+    metadata || {},
+    this.methodDescriptorInitiateIgnition);
+  }
+
   methodDescriptorTriggerRatchet = new grpcWeb.MethodDescriptor(
     '/reflex.ReflexService/TriggerRatchet',
     grpcWeb.MethodType.UNARY,

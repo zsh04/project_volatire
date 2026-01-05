@@ -1,5 +1,6 @@
 'use client';
 
+import { useRef } from 'react';
 import { AlphaRibbon } from '@/components/layout/AlphaRibbon';
 import { SafetySidebar } from '@/components/layout/SafetySidebar';
 import { DepthVault } from '@/components/zones/DepthVault';
@@ -10,15 +11,25 @@ import { ForensicScrub } from '@/components/hud/ForensicScrub';
 import Vitality from '@/components/hud/Vitality'; // Directive-80
 import { HotswapStatus } from '@/components/hud/HotswapStatus'; // Directive-81
 import IgnitionSwitch from '@/components/hud/IgnitionSwitch'; // D-83
+import { CommandDeck } from '@/components/CommandDeck'; // D-UX
+import { useSystemStore } from '@/lib/stores/system-store';
 
 export default function Home() {
+  const systemSanityScore = useSystemStore((state) => state.systemSanityScore);
+
+  // Determine Halo Class
+  const haloClass =
+    systemSanityScore > 0.8 ? 'fidelity-halo-laminar' :
+      systemSanityScore > 0.5 ? 'fidelity-halo-degraded' :
+        'fidelity-halo-critical';
+
   return (
-    <main className="h-screen w-screen flex flex-col bg-[#0D1117] overflow-hidden text-white">
+    <main className={`h-screen w-screen flex flex-col bg-[#0D1117] overflow-hidden text-white transition-all duration-500 ${haloClass}`}>
       {/* 1. Global Header (Alpha Ribbon) */}
       <AlphaRibbon />
 
       {/* 2. Main Workspace (Sidebar + 3-Column Grid) */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden mb-24"> {/* Margin Bottom for Command Deck */}
         {/* Left Rail: Safety Sidebar */}
         <SafetySidebar />
 
@@ -68,6 +79,9 @@ export default function Home() {
 
         </div>
       </div>
+
+      {/* D-UX: Sovereign Command Deck Footer */}
+      <CommandDeck />
     </main>
   );
 }
