@@ -15,6 +15,9 @@ service ReflexService {
   // 4. Demote Provisional (Safety Staircase)
   rpc DemoteProvisional (DemoteRequest) returns (Ack);
 
+  // D-83: Initiate Ignition
+  rpc InitiateIgnition (Empty) returns (Ack);
+
   // --- Legacy / Aux ---
   // Force a risk level change
   rpc TriggerRatchet (RatchetRequest) returns (Ack);
@@ -35,6 +38,9 @@ message PhysicsResponse {
     double efficiency_index = 6;
     double timestamp = 7;
     
+    // Global Sequence ID (Directive-79)
+    int64 sequence_id = 16;
+    
     // Account State
     double unrealized_pnl = 8;
     double equity = 9;
@@ -50,6 +56,28 @@ message PhysicsResponse {
     
     // Audit Telemetry
     double audit_drift = 15;
+    
+    // Directive-80: Vitality Sentinel metrics
+    double system_latency_us = 17;
+    double system_jitter_us = 18;
+    string vitality_status = 19; // "OPTIMAL", "DEGRADED", "CRITICAL"
+    
+    // Directive-81: Reasoning Trace (Cognitive Projection)
+    repeated ReasoningStep reasoning_trace = 20;
+
+    // D-83: Ignition Status
+    string ignition_status = 21; 
+    
+    // D-90: Recursive Risk Re-balancer Fidelity
+    double system_sanity_score = 22;
+}
+
+message ReasoningStep {
+    string id = 1;
+    string content = 2;
+    double probability = 3;
+    string type = 4; // "hypothesis", "deduction", "conclusion"
+    double timestamp = 5;
 }
 
 message OODAResponse {

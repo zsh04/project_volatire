@@ -16,6 +16,9 @@ pub struct PhysicsState {
     pub entropy: f64,       // Shannon Entropy ($H$)
     pub efficiency_index: f64, // Kaufman Efficiency Ratio
     pub basis: f64,         // Futures Basis (Annualized)
+    
+    // Directive-79: Global Sequence ID
+    pub sequence_id: u64,
 }
 
 impl Default for PhysicsState {
@@ -30,6 +33,7 @@ impl Default for PhysicsState {
             entropy: 0.0,
             efficiency_index: 0.0,
             basis: 0.0,
+            sequence_id: 0,
         }
     }
 }
@@ -69,7 +73,7 @@ impl PhysicsEngine {
         }
     }
 
-    pub fn update(&mut self, price: f64, timestamp: f64) -> PhysicsState {
+    pub fn update(&mut self, price: f64, timestamp: f64, sequence_id: u64) -> PhysicsState {
         // 1. Update History
         if self.history.len() >= self.capacity {
             self.history.pop_front();
@@ -80,7 +84,7 @@ impl PhysicsEngine {
         // 2. Welford's Algorithm (Volatility - Instantaneous context)
         // Note: This tracks global run-time volatility or regime volatility? 
         // Welford usually tracks *cumulative* stats. The requirement implies we want windowed volatility 
-        // for efficiency ratio, but Welford is good for a running metric. We'll keep it as is for "realized vol".
+        // for efficiency ratio, but Welford is good for a running metrics. We'll keep it as is for "realized vol".
         let return_val = if self.prev_state.price != 0.0 {
             (price - self.prev_state.price) / self.prev_state.price
         } else {
@@ -112,10 +116,11 @@ impl PhysicsEngine {
         
         // Guard: Zero Time Delta
         if dt_fast.abs() < f64::EPSILON {
-             // Avoid NaN, return previous state but update price/ts
+             // Avoid NaN, return previous state but update price/ts/seq
              let mut same_state = self.prev_state;
              same_state.timestamp = timestamp;
              same_state.price = price;
+             same_state.sequence_id = sequence_id;
              return same_state;
         }
 
@@ -154,6 +159,7 @@ impl PhysicsEngine {
             entropy,
             efficiency_index,
             basis: 0.0, // Default to 0.0 until Ingest Pipeline feeds Basis
+            sequence_id,
         };
 
         self.prev_state = new_state;
@@ -268,7 +274,7 @@ mod tests {
         // 1. Stable period
         // Feed 200 ticks of stable price 100.0
         for i in 0..200 {
-            engine.update(100.0, i as f64);
+            engine.update(100.0, i as f64, 0);
         }
         
         // 2. Sudden Spike upwards
@@ -288,7 +294,7 @@ mod tests {
         // Let's implement the test_impulse as requested: 
         // Feed sudden spike.
         
-        let s = engine.update(110.0, 200.0); // Step from 199->200
+        let s = engine.update(110.0, 200.0, 0); // Step from 199->200
         
         // Log logic check:
         // Past (100 ticks ago) = index 200 - 1 - 100 = 99.
@@ -313,7 +319,7 @@ mod tests {
         for i in 0..1100 {
             let noise = (i as f64 * 37.0).sin() * 5.0; // Oscillates fast
             let price = 1000.0 + noise;
-            let s = engine.update(price, i as f64);
+            let s = engine.update(price, i as f64, 0);
             
             if i > 1050 {
                 // Should be high entropy (randomness) and low efficiency (choppy)
@@ -337,13 +343,13 @@ mod tests {
         
         // Feed linear ramp 0..300
         for i in 0..300 {
-            engine.update(i as f64, i as f64);
+            engine.update(i as f64, i as f64, 0);
         }
         
         // At i=300 (t=300, p=300)
         // Past is t=200, p=200.
         // v = (300-200)/(300-200) = 1.0.
-        let s = engine.update(300.0, 300.0);
+        let s = engine.update(300.0, 300.0, 0);
         assert!((s.velocity - 1.0).abs() < 1e-5);
         assert!((s.acceleration).abs() < 1e-5);
     }
@@ -354,10 +360,10 @@ mod tests {
         
         // Feed > 1000 ticks of pure trend to trigger checks
         for i in 0..1100 {
-            engine.update(i as f64, i as f64);
+            engine.update(i as f64, i as f64, 0);
         }
         
-        let s = engine.update(1100.0, 1100.0);
+        let s = engine.update(1100.0, 1100.0, 0);
         // ER should be 1.0
         assert!((s.efficiency_index - 1.0).abs() < 1e-5);
     }

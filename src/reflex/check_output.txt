@@ -1,0 +1,76 @@
+    Checking reflex v0.1.0 (/Users/zishanmalik/voltaire/src/reflex)
+warning: unused import: `std::collections::HashMap`
+  --> src/ingest/kraken.rs:12:5
+   |
+12 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `FirewallError`
+  --> src/governor/ooda_loop.rs:63:64
+   |
+63 | use crate::auditor::firewall::{Firewall, LlmInferenceResponse, FirewallError};
+   |                                                                ^^^^^^^^^^^^^
+
+warning: unused imports: `ControlMessage`, `MsgFlags`, `UnixAddr`, `recvmsg`, and `sendmsg`
+ --> src/governor/handoff.rs:7:24
+  |
+7 | use nix::sys::socket::{sendmsg, recvmsg, ControlMessage, MsgFlags, UnixAddr};
+  |                        ^^^^^^^  ^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^
+
+warning: unused import: `info`
+ --> src/governor/rebalancer.rs:2:15
+  |
+2 | use tracing::{info, warn, error};
+  |               ^^^^
+
+warning: unused import: `super::*`
+  --> src/auditor/firewall.rs:88:9
+   |
+88 |     use super::*;
+   |         ^^^^^^^^
+
+warning: unused import: `Heartbeat`
+  --> src/server.rs:11:51
+   |
+11 |     DemoteRequest, RatchetRequest, ConfigPayload, Heartbeat,
+   |                                                   ^^^^^^^^^
+
+warning: unused import: `Duration`
+ --> src/sequencer/sync_gate.rs:1:17
+  |
+1 | use std::time::{Duration, Instant};
+  |                 ^^^^^^^^
+
+warning: unused import: `tracing::warn`
+ --> src/sequencer/sync_gate.rs:2:5
+  |
+2 | use tracing::warn;
+  |     ^^^^^^^^^^^^^
+
+error[E0308]: mismatched types
+   --> src/governor/ooda_loop.rs:146:32
+    |
+146 |                         return (None, None);
+    |                                ^^^^^^^^^^^^ expected `OODAState`, found `(Option<_>, Option<_>)`
+    |
+    = note: expected struct `OODAState`
+                found tuple `(std::option::Option<_>, std::option::Option<_>)`
+note: return type inferred to be `OODAState` here
+   --> src/governor/ooda_loop.rs:111:111
+    |
+111 |     pub async fn orient(&mut self, physics: PhysicsState, regime_id: u8, client: Option<&mut BrainClient>) -> OODAState {
+    |                                                                                                               ^^^^^^^^^
+
+warning: unused variable: `ts`
+  --> src/historian/biopsy.rs:33:17
+   |
+33 |             let ts = packet.timestamp; // Instant is hard to serialize to absolute time without anchor.
+   |                 ^^ help: if this is intentional, prefix it with an underscore: `_ts`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+For more information about this error, try `rustc --explain E0308`.
+warning: `reflex` (lib) generated 9 warnings
+error: could not compile `reflex` (lib) due to 1 previous error; 9 warnings emitted

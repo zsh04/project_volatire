@@ -15,7 +15,7 @@ export function AlphaRibbon() {
             <div className="flex items-center gap-3">
                 <Activity className="w-5 h-5 text-yellow-400" />
                 <h1 className="font-mono text-sm font-bold text-white tracking-widest uppercase">
-                    Voltaire <span className="text-white/40">//</span> Pro
+                    Voltaire <span className="text-white/40">{'//'}</span> Pro
                 </h1>
             </div>
 

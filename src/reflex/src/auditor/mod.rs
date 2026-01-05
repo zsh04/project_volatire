@@ -1,5 +1,10 @@
 use tracing::{info, warn};
 
+pub mod truth_envelope;
+pub mod firewall;
+pub mod nullifier; // D-88
+pub mod red_team; // D-93
+
 pub struct Auditor {
     // Connection to QuestDB for tracing would go here
     // e.g., questdb_sender:Sender 
@@ -40,7 +45,7 @@ impl Auditor {
 pub mod gatekeeper {
     use super::*;
 
-    pub fn verify_alignment(auditor: &Auditor, hypatia_view: &str, gemma_view: &str) -> bool {
+    pub fn verify_alignment(_auditor: &Auditor, hypatia_view: &str, gemma_view: &str) -> bool {
         // Check for 'Parrot' behavior or 'Hallucination'
         if hypatia_view == gemma_view {
             warn!("⚠️ ALIGNMENT WARNING: Gemma is parroting Hypatia. IDS Score Low.");

@@ -27,7 +27,9 @@ interface SystemStore {
     currentRegime: 'LAMINAR' | 'TURBULENT' | 'DECOHERENT';
     setRegime: (regime: 'LAMINAR' | 'TURBULENT' | 'DECOHERENT') => void;
 
-    // Audit Loop (Directive-66)
+    // D-81: Hot-Swap
+    hotswapActive: boolean;
+    setHotswapActive: (active: boolean) => void;
     audit: {
         driftScore: number; // 0.0 - 1.0
         isRecalibrating: boolean;
@@ -55,6 +57,29 @@ interface SystemStore {
     // Kill Switch
     isHalted: boolean;
     setHalted: (halted: boolean) => void;
+
+    // Forensic Scrub (Directive-78)
+    scrubMode: boolean;
+    scrubTimestamp: number | null; // The exact time being viewed
+    forensicEvents: ForensicEvent[];
+    setScrubMode: (active: boolean) => void;
+    setScrubTimestamp: (ts: number | null) => void;
+    addForensicEvent: (event: ForensicEvent) => void;
+
+    // D-83: Ignition
+    ignitionStatus: 'HIBERNATION' | 'HARDWARECHECK' | 'WARMINGUP' | 'PENNYTRADE' | 'AWAITINGGEMMA' | 'IGNITED';
+    setIgnitionStatus: (status: SystemStore['ignitionStatus']) => void;
+
+    // D-90: Governor Sanity
+    systemSanityScore: number;
+    setSystemSanityScore: (score: number) => void;
+}
+
+export interface ForensicEvent {
+    id: string;
+    timestamp: number;
+    type: 'VETO' | 'DRIFT' | 'PHASE_SHIFT' | 'MANUAL';
+    label: string;
 }
 
 export interface StaircaseState {
@@ -196,4 +221,26 @@ export const useSystemStore = create<SystemStore>((set) => ({
     updateFinance: (updates) => set((state) => ({
         finance: { ...state.finance, ...updates }
     })),
+
+    // Forensic Implementation
+    scrubMode: false,
+    scrubTimestamp: null,
+    forensicEvents: [],
+    setScrubMode: (active) => set({ scrubMode: active }),
+    setScrubTimestamp: (ts) => set({ scrubTimestamp: ts }),
+    addForensicEvent: (event) => set((state) => ({
+        forensicEvents: [...state.forensicEvents, event]
+    })),
+
+    // D-81: Hot-Swap
+    hotswapActive: false,
+    setHotswapActive: (active) => set({ hotswapActive: active }),
+
+    // D-83: Ignition
+    ignitionStatus: 'HIBERNATION',
+    setIgnitionStatus: (status) => set({ ignitionStatus: status }),
+
+    // D-90: Governor Sanity
+    systemSanityScore: 1.0,
+    setSystemSanityScore: (score) => set({ systemSanityScore: score }),
 }));

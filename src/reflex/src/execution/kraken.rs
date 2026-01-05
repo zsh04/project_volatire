@@ -28,17 +28,19 @@ impl KrakenClient {
         })
     }
     
-    /// Place a test limit order on Kraken
+    /// Place an order on Kraken
     /// pair: e.g., "XBTUSD"
     /// side: "buy" or "sell"
     /// volume: quantity in base currency
     /// price: limit price
-    pub async fn place_test_order(
+    /// validate_only: if true, validate inputs only (no execution)
+    pub async fn place_order(
         &self,
         pair: &str,
         side: &str,
         volume: f64,
         price: f64,
+        validate_only: bool,
     ) -> Result<String, Box<dyn std::error::Error>> {
         
         let mut params = std::collections::HashMap::new();
@@ -47,7 +49,10 @@ impl KrakenClient {
         params.insert("ordertype", "limit".to_string());
         params.insert("price", price.to_string());
         params.insert("volume", volume.to_string());
-        params.insert("validate", "true".to_string()); // TEST ONLY - validate without execution
+        
+        if validate_only {
+            params.insert("validate", "true".to_string());
+        }
         
         let nonce = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)?
@@ -56,20 +61,32 @@ impl KrakenClient {
         params.insert("nonce", nonce.clone());
         
         // Sign request
+        // Manually build POST body to ensure order matches signature
+        let mut post_data = params.iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>();
+        post_data.sort(); // Must match sorting in sign()
+        let post_data_str = post_data.join("&");
+
+        // Sign using the EXACT string we will send
         let path = "/0/private/AddOrder";
-        let signature = self.sign(path, &params)?;
+        let signature = self.sign(path, &nonce, &post_data_str)?;
         
-        // Build request
         let url = format!("{}{}", self.base_url, path);
         let client = reqwest::Client::new();
         
-        info!("🔐 Kraken: Placing TEST order (validate=true) - {} {} @ {} (Vol: {})", side.to_uppercase(), pair, price, volume);
+        if validate_only {
+            info!("🔐 Kraken: Placing VALIDATION order - {} {} @ {} (Vol: {})", side.to_uppercase(), pair, price, volume);
+        } else {
+            info!("🚨 Kraken: Placing LIVE order - {} {} @ {} (Vol: {})", side.to_uppercase(), pair, price, volume);
+        }
         
         let response: reqwest::Response = client
             .post(&url)
             .header("API-Key", &self.api_key)
             .header("API-Sign", signature)
-            .form(&params)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(post_data_str) // Send exact string
             .send()
             .await?;
         
@@ -92,18 +109,9 @@ impl KrakenClient {
         }
     }
     
-    fn sign(&self, path: &str, params: &std::collections::HashMap<&str, String>) 
+    fn sign(&self, path: &str, nonce: &str, post_data_str: &str) 
         -> Result<String, Box<dyn std::error::Error>> 
     {
-        let nonce = params.get("nonce").ok_or("Missing nonce")?;
-        
-        // Build POST data
-        let mut post_data = params.iter()
-            .map(|(k, v)| format!("{}={}", k, v))
-            .collect::<Vec<_>>();
-        post_data.sort(); // Kraken requires sorted params
-        let post_data_str = post_data.join("&");
-        
         // SHA256(nonce + postdata)
         let mut hasher = Sha256::new();
         hasher.update(format!("{}{}", nonce, post_data_str));
@@ -133,7 +141,7 @@ mod tests {
         dotenvy::dotenv().ok();
         
         let client = KrakenClient::new().expect("Failed to create client");
-        let result = client.place_test_order("XBTUSD", "buy", 0.001, 30000.0).await;
+        let result = client.place_order("XBTUSD", "buy", 0.001, 30000.0, true).await;
         
         assert!(result.is_ok(), "Order validation failed: {:?}", result.err());
     }

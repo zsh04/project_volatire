@@ -6,6 +6,10 @@ import { DepthVault } from '@/components/zones/DepthVault';
 import { RiemannWave } from '@/components/hud/RiemannWave';
 import { ReasoningStream } from '@/components/debate/ReasoningStream';
 import { ConsensusMeter } from '@/components/debate/ConsensusMeter';
+import { ForensicScrub } from '@/components/hud/ForensicScrub';
+import Vitality from '@/components/hud/Vitality'; // Directive-80
+import { HotswapStatus } from '@/components/hud/HotswapStatus'; // Directive-81
+import IgnitionSwitch from '@/components/hud/IgnitionSwitch'; // D-83
 
 export default function Home() {
   return (
@@ -33,6 +37,16 @@ export default function Home() {
               {/* We use absolute positioning for the cloud to ensure it fills the flex container */}
               <div className="absolute inset-0">
                 <RiemannWave />
+              </div>
+
+              {/* D-78: Forensic Scrub Overlay */}
+              <ForensicScrub />
+
+              {/* D-80: Vitality Sentinel Overlay (Top Right) */}
+              <div className="absolute top-4 right-4 z-20 flex flex-col gap-2 items-end">
+                <Vitality />
+                <HotswapStatus />
+                <IgnitionSwitch />
               </div>
             </div>
 

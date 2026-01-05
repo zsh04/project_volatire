@@ -138,6 +138,7 @@ mod tests {
             entropy: 0.8,
             efficiency_index: 0.9,
             basis: 0.0,
+            sequence_id: 0,
         };
 
         store.update_kinetics("BTC-USDT", &kp).await.expect("Pipeline failed");
@@ -168,6 +169,7 @@ mod tests {
             entropy: 0.8,
             efficiency_index: 0.9,
             basis: 0.0,
+            sequence_id: 0,
         };
 
         // Warmup

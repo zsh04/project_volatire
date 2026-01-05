@@ -41,6 +41,9 @@ tokio-postgres = "0.7.15"
 deadpool-postgres = "0.14"
 deadpool-redis = "0.10"
 rmp-serde = "1.1" # MessagePack Serialization
+nix = { version = "0.27", features = ["socket", "uio", "fs", "process", "signal"] } # Unix Sockets & SCM_RIGHTS (D-81)
+memmap2 = "0.9" # Shared Memory (D-81)
+bincode = "1.3" # State Serialization (D-81)
 
 # Telemetry
 opentelemetry = { version = "0.21", features = ["metrics", "logs"] }
@@ -53,6 +56,15 @@ opentelemetry-appender-tracing = "0.2"
 # Connection Pooling
 redis = { version = "0.21.7", features = ["tokio-comp"] }
 # bincode removed in favor of MessagePack (D-42)
+
+# Zero-Copy Logging (D-82)
+rkyv = { version = "0.7.42", features = ["validation", "std"] }
+bytemuck = "1.14"
+once_cell = "1.19"
+
+# Cryptography (Memory Safety)
+libc = "0.2"
+zeroize = { version = "1.7", features = ["zeroize_derive"] }
 
 # Cryptography (Auth) - for Forensics & Kraken
 hmac = "0.12"
@@ -84,3 +96,7 @@ path = "src/bin/audit_runner.rs"
 [[bin]]
 name = "live_runner"
 path = "src/bin/live_runner.rs"
+
+[[bin]]
+name = "test_execution"
+path = "src/bin/test_execution.rs"

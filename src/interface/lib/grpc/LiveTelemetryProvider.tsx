@@ -107,8 +107,40 @@ export function LiveTelemetryProvider({ children }: { children: React.ReactNode 
                 // Red/Crimson Tint + slight pulse effect ideally, but static for now
                 body.style.boxShadow = 'inset 0 0 200px rgba(239, 68, 68, 0.15)'; // red-500
                 break;
+                break;
         }
     }, [currentRegime]);
+
+    // 4. Forensic Scrub Hook (Directive-78)
+    const { scrubMode, scrubTimestamp } = useSystemStore(state => ({
+        scrubMode: state.scrubMode,
+        scrubTimestamp: state.scrubTimestamp
+    }));
+
+    useEffect(() => {
+        if (!workerRef.current) return;
+
+        if (scrubMode) {
+            workerRef.current.postMessage({
+                type: 'SET_MODE',
+                payload: { mode: 'SCRUB' }
+            });
+        } else {
+            workerRef.current.postMessage({
+                type: 'SET_MODE',
+                payload: { mode: 'LIVE' }
+            });
+        }
+    }, [scrubMode]);
+
+    useEffect(() => {
+        if (scrubMode && scrubTimestamp && workerRef.current) {
+            workerRef.current.postMessage({
+                type: 'SCRUB_SEEK',
+                payload: { timestamp: scrubTimestamp }
+            });
+        }
+    }, [scrubTimestamp, scrubMode]);
 
     return <>{children}</>;
 }

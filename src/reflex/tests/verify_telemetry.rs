@@ -26,7 +26,7 @@ async fn test_telemetry_emission() {
 
     // 4. Run Cycle (Should generate spans)
     info!("TEST: Running OODA Cycle...");
-    let state = ooda.orient(physics, None).await; // Negative sentiment simulated by None fallback
+    let state = ooda.orient(physics, 0, None).await; // Negative sentiment simulated by None fallback
     let _decision = ooda.decide(&state);
     
     // 5. Wait for batch flush (Batch processor default 1s or size)

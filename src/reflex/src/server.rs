@@ -8,7 +8,8 @@ use serde::Serialize;
 use crate::reflex_proto::reflex_service_server::ReflexService;
 use crate::reflex_proto::{
     Ack, Empty, PhysicsResponse, OodaResponse, VetoRequest, 
-    DemoteRequest, RatchetRequest, ConfigPayload, Heartbeat
+    DemoteRequest, RatchetRequest, ConfigPayload, Heartbeat,
+    ReasoningStep // D-81
 };
 use crate::feynman::PhysicsState;
 use crate::governor::ooda_loop::OODAState;
@@ -35,6 +36,14 @@ pub struct GovernanceState {
     pub staircase_tier: i32,
     pub staircase_progress: f64,
     pub audit_drift: f64,
+    pub system_sanity_score: f64, // D-90
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct VitalityState {
+    pub latency_us: f64,
+    pub jitter_us: f64,
+    pub status: String,
 }
 
 #[derive(Debug, Clone)]
@@ -45,6 +54,11 @@ pub struct SharedState {
     pub account: AccountSnapshot,
     pub gemma: ModelMetrics,
     pub governance: GovernanceState,
+    pub vitality: VitalityState, // D-80
+    // Directive-81: Reasoning Trace
+    pub reasoning_trace: Vec<ReasoningStep>,
+    pub ignition_status: String, // D-83
+    pub ignition_request: bool, // D-83 Trigger
 }
 
 impl Default for SharedState {
@@ -56,6 +70,10 @@ impl Default for SharedState {
             account: AccountSnapshot::default(),
             gemma: ModelMetrics::default(),
             governance: GovernanceState::default(),
+            vitality: VitalityState::default(),
+            reasoning_trace: Vec::new(),
+            ignition_status: "HIBERNATION".to_string(), // Default
+            ignition_request: false,
         }
     }
 }
@@ -104,6 +122,22 @@ impl ReflexService for ReflexServerImpl {
             staircase_tier: r.governance.staircase_tier,
             staircase_progress: r.governance.staircase_progress,
             audit_drift: r.governance.audit_drift,
+            // Directive-80: Vitality
+            system_latency_us: r.vitality.latency_us,
+            system_jitter_us: r.vitality.jitter_us,
+            vitality_status: r.vitality.status.clone(),
+            
+            // Directive-79: Global Sequence ID
+            sequence_id: r.physics.sequence_id as i64,
+            
+            // Directive-81: Reasoning Trace
+            reasoning_trace: r.reasoning_trace.clone(),
+            
+            // D-83: Ignition Status
+            ignition_status: r.ignition_status.clone(),
+            
+            // D-90: Global Fidelity
+            system_sanity_score: r.governance.system_sanity_score,
         }))
     }
 
@@ -131,6 +165,22 @@ impl ReflexService for ReflexServerImpl {
                     staircase_tier: r.governance.staircase_tier,
                     staircase_progress: r.governance.staircase_progress,
                     audit_drift: r.governance.audit_drift,
+                    // Directive-80: Vitality
+                    system_latency_us: r.vitality.latency_us,
+                    system_jitter_us: r.vitality.jitter_us,
+                    vitality_status: r.vitality.status.clone(),
+                    
+                    // Directive-79: Global Sequence ID
+                    sequence_id: ooda.physics.sequence_id as i64,
+                    
+                    // Directive-81: Reasoning Trace
+                    reasoning_trace: r.reasoning_trace.clone(),
+
+                    // D-83: Ignition Status
+                    ignition_status: r.ignition_status.clone(),
+                    
+                    // D-90: System Sanity Score
+                    system_sanity_score: r.governance.system_sanity_score,
                 }),
                 sentiment_score: ooda.sentiment_score,
                 nearest_regime: ooda.nearest_regime.as_ref().map(|s| s.clone()),
@@ -154,6 +204,13 @@ impl ReflexService for ReflexServerImpl {
 
     async fn demote_provisional(&self, _req: Request<DemoteRequest>) -> Result<Response<Ack>, Status> {
          Ok(Response::new(Ack { success: true, message: "Use Provisional API (Upcoming)".into() }))
+    }
+
+    async fn initiate_ignition(&self, _req: Request<Empty>) -> Result<Response<Ack>, Status> {
+        tracing::info!("🚀 IGNITION INITIATED BY OPERATOR");
+        let mut w = self.state.write().map_err(|_| Status::internal("Lock poisoned"))?;
+        w.ignition_request = true;
+        Ok(Response::new(Ack { success: true, message: "Ignition Sequence Initiated".into() }))
     }
 
     // --- Legacy Stubs ---
@@ -237,6 +294,23 @@ impl ReflexService for ReflexServerImpl {
                             staircase_tier: state.governance.staircase_tier,
                             staircase_progress: state.governance.staircase_progress,
                             audit_drift: state.governance.audit_drift,
+                            
+                            // Directive-80: Vitality
+                            system_latency_us: state.vitality.latency_us,
+                            system_jitter_us: state.vitality.jitter_us,
+                            vitality_status: state.vitality.status.clone(),
+                            
+                            // Directive-79: Global Sequence ID
+                            sequence_id: state.physics.sequence_id as i64,
+                            
+                            // Directive-81: Reasoning Trace
+                            reasoning_trace: state.reasoning_trace.clone(),
+                            
+                            // D-83: Ignition Status
+                            ignition_status: state.ignition_status.clone(),
+                            
+                            // D-90: Recursive Risk Re-balancer Fidelity
+                            system_sanity_score: state.governance.system_sanity_score,
                         })
                     },
                     Err(_) => Err(Status::internal("Lagged")),

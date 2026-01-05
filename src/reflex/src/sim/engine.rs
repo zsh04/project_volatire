@@ -76,7 +76,7 @@ impl SimulationEngine {
                     }
 
                     // 1. Update Physics
-                    let state = self.physics.update(tick.price, tick.timestamp);
+                    let state = self.physics.update(tick.price, tick.timestamp, 0);
                     
                     // 2. Mock Brain Intent
                     let action = if state.velocity > 0.0 { "LONG" } else { "HOLD" };

@@ -1,0 +1,288 @@
+   Compiling reflex v0.1.0 (/Users/zishanmalik/voltaire/src/reflex)
+warning: unused import: `std::collections::HashMap`
+  --> src/ingest/kraken.rs:12:5
+   |
+12 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `FirewallError`
+  --> src/governor/ooda_loop.rs:63:64
+   |
+63 | use crate::auditor::firewall::{Firewall, LlmInferenceResponse, FirewallError};
+   |                                                                ^^^^^^^^^^^^^
+
+warning: unused imports: `ControlMessage`, `MsgFlags`, `UnixAddr`, `recvmsg`, and `sendmsg`
+ --> src/governor/handoff.rs:7:24
+  |
+7 | use nix::sys::socket::{sendmsg, recvmsg, ControlMessage, MsgFlags, UnixAddr};
+  |                        ^^^^^^^  ^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^
+
+warning: unused import: `info`
+ --> src/governor/rebalancer.rs:2:15
+  |
+2 | use tracing::{info, warn, error};
+  |               ^^^^
+
+warning: unused import: `super::*`
+  --> src/auditor/firewall.rs:88:9
+   |
+88 |     use super::*;
+   |         ^^^^^^^^
+
+warning: unused import: `Heartbeat`
+  --> src/server.rs:11:51
+   |
+11 |     DemoteRequest, RatchetRequest, ConfigPayload, Heartbeat,
+   |                                                   ^^^^^^^^^
+
+warning: unused import: `Duration`
+ --> src/sequencer/sync_gate.rs:1:17
+  |
+1 | use std::time::{Duration, Instant};
+  |                 ^^^^^^^^
+
+warning: unused import: `tracing::warn`
+ --> src/sequencer/sync_gate.rs:2:5
+  |
+2 | use tracing::warn;
+  |     ^^^^^^^^^^^^^
+
+warning: unused variable: `ts`
+  --> src/historian/biopsy.rs:33:17
+   |
+33 |             let ts = packet.timestamp; // Instant is hard to serialize to absolute time without anchor.
+   |                 ^^ help: if this is intentional, prefix it with an underscore: `_ts`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `current_psi` is never read
+  --> src/governor/wave_legislator.rs:29:5
+   |
+24 | pub struct WaveLegislator {
+   |            -------------- field in this struct
+...
+29 |     current_psi: Complex64,   // Current Wave State (simplified)
+   |     ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `SLIPPAGE_TOLERANCE_BPS` is never used
+ --> src/governor/audit_loop.rs:5:7
+  |
+5 | const SLIPPAGE_TOLERANCE_BPS: f64 = 2.0; // Basis points
+  |       ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `latency_threshold_us` is never read
+  --> src/governor/sentinel.rs:25:5
+   |
+22 | pub struct Sentinel {
+   |            -------- field in this struct
+...
+25 |     latency_threshold_us: f64,
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: fields `api_key` and `api_secret` are never read
+  --> src/gateway/order_manager.rs:30:5
+   |
+28 | pub struct OrderGateway {
+   |            ------------ fields in this struct
+29 |     // Configuration
+30 |     api_key: String,
+   |     ^^^^^^^
+31 |     api_secret: String,
+   |     ^^^^^^^^^^
+
+warning: variable `barrier_V` should have a snake case name
+  --> src/governor/wave_legislator.rs:62:9
+   |
+62 |         barrier_V: f64,
+   |         ^^^^^^^^^ help: convert the identifier to snake case (notice the capitalization): `barrier_v`
+   |
+   = note: `#[warn(non_snake_case)]` (part of `#[warn(nonstandard_style)]`) on by default
+
+warning: variable `kinetic_T` should have a snake case name
+  --> src/governor/wave_legislator.rs:75:13
+   |
+75 |         let kinetic_T = velocity.powi(2) * 0.5;
+   |             ^^^^^^^^^ help: convert the identifier to snake case: `kinetic_t`
+
+warning: variable `potential_V` should have a snake case name
+  --> src/governor/wave_legislator.rs:78:13
+   |
+78 |         let potential_V = barrier_V;
+   |             ^^^^^^^^^^^ help: convert the identifier to snake case (notice the capitalization): `potential_v`
+
+warning: `reflex` (lib) generated 16 warnings (run `cargo fix --lib -p reflex` to apply 9 suggestions)
+warning: unused imports: `OodaResponse`, `PhysicsResponse`, `ReflexServiceServer`, and `ReflexService`
+  --> src/main.rs:19:5
+   |
+19 |     PhysicsResponse, OodaResponse, ReasoningStep, // D-81
+   |     ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^
+20 |     reflex_service_server::{ReflexService, ReflexServiceServer}
+   |                             ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `Status` and `transport::Server`
+  --> src/main.rs:22:13
+   |
+22 | use tonic::{transport::Server, Status};
+   |             ^^^^^^^^^^^^^^^^^  ^^^^^^
+
+warning: unused import: `OODAState`
+ --> tests/verify_telemetry.rs:1:59
+  |
+1 | use reflex::governor::ooda_loop::{OODACore, PhysicsState, OODAState};
+  |                                                           ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> src/main.rs:306:9
+    |
+306 |     let mut staircase_governor = reflex::governor::staircase::Staircase::new();
+    |         ----^^^^^^^^^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> src/main.rs:321:9
+    |
+321 |     let mut last_processed_yield = Instant::now();
+    |         ----^^^^^^^^^^^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/main.rs:373:9
+    |
+373 |     let mut audit_loop = reflex::governor::audit_loop::AuditLoop::new();
+    |         ----^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `state_store`
+   --> src/main.rs:108:9
+    |
+108 |     let state_store = match state_store_res {
+    |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_state_store`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `last_processed_yield`
+   --> src/main.rs:321:9
+    |
+321 |     let mut last_processed_yield = Instant::now();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_last_processed_yield`
+
+warning: unused variable: `simons_pred`
+   --> src/main.rs:728:13
+    |
+728 |         let simons_pred = simons.forward(state.velocity);
+    |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_simons_pred`
+
+warning: `reflex` (bin "reflex" test) generated 8 warnings (run `cargo fix --bin "reflex" -p reflex --tests` to apply 8 suggestions)
+warning: `reflex` (bin "reflex") generated 8 warnings (8 duplicates)
+warning: `reflex` (test "verify_telemetry") generated 1 warning (run `cargo fix --test "verify_telemetry" -p reflex` to apply 1 suggestion)
+warning: `reflex` (lib test) generated 15 warnings (15 duplicates)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 7.75s
+warning: the following packages contain code that will be rejected by a future version of Rust: redis v0.21.7
+note: to see what the problems were, use the option `--future-incompat-report`, or run `cargo report future-incompatibilities --id 3`
+     Running unittests src/lib.rs (target/debug/deps/reflex-229da9a6e0160259)
+
+running 75 tests
+test auditor::firewall::tests::test_numeric_anchor_fail ... ok
+test auditor::firewall::tests::test_numeric_anchor_pass ... ok
+test brain::veto_gate::tests::test_anti_panic_validation ... ok
+test auditor::tests::test_gatekeeper_parrot ... ok
+test auditor::tests::test_trace_and_ack ... ok
+test brain::veto_gate::tests::test_decay_sensitivity ... ok
+test brain::veto_gate::tests::test_ghost_halt_prevention_logic ... ok
+test brain::veto_gate::tests::test_nuclear_halt ... ok
+test execution::auth::tests::test_nonce_manager ... ok
+test execution::kraken::tests::test_kraken_order_validation ... ignored
+test execution::auth::tests::test_binance_signature ... ok
+test execution::auth::tests::test_kraken_signature_structure ... ok
+test execution::actor::tests::test_nuclear_dispatch ... ok
+test gateway::venue_sentry::tests::test_broken_pipe ... ok
+test feynman::tests::test_impulse_spike ... ok
+test gateway::venue_sentry::tests::test_liquidity_vacuum ... ok
+test gateway::venue_sentry::tests::test_latency_veto ... ok
+test governor::audit_loop::tests::test_drift_calculation ... ok
+test governor::audit_loop::tests::test_recalibration ... ok
+test governor::authority::tests::test_authority_bridge_creation ... ok
+test feynman::tests::test_derivatives_linear_ramp ... ok
+test governor::authority::tests::test_command_latency_tracking ... ok
+test governor::authority::tests::test_multiple_commands ... ok
+test governor::authority::tests::test_sentiment_override ... ok
+test governor::authority::tests::test_tactical_pause ... ok
+test governor::kill_switch::tests::test_manual_trigger ... ok
+test governor::lockdown::tests::test_acceptance_gates_all_passed ... ok
+test governor::lockdown::tests::test_acceptance_gates_one_failed ... ok
+test governor::lockdown::tests::test_lockdown_governor_default ... ok
+test governor::ooda_loop::tests::test_jitter_fallback_logic ... ok
+test governor::ooda_loop::tests::test_veto_logic ... ok
+test governor::provisional::tests::test_emergency_freeze ... ok
+test governor::provisional::tests::test_safety_staircase_climb ... ok
+test governor::provisional::tests::test_shadow_rejection ... ok
+test governor::provisional::tests::test_warmup_lockout ... ok
+test governor::regime_detector::tests::test_hysteresis_reset ... ok
+test governor::regime_detector::tests::test_hysteresis_transition ... ok
+test governor::regime_detector::tests::test_instant_classification ... ok
+test governor::regime_detector::tests::test_initial_state ... ok
+test governor::staircase::tests::test_initial_state ... ok
+test governor::staircase::tests::test_emergency_slide ... ok
+test governor::staircase::tests::test_promotion_gates ... ok
+test governor::staircase::tests::test_promotion_mechanics ... ok
+test governor::staircase::tests::test_veto_lockout ... ok
+test governor::superposition::tests::test_structural_noise ... ok
+test governor::superposition::tests::test_trend_purity ... ok
+test ledger::tests::test_equity_and_drawdown ... ok
+test market::kraken::tests::test_parse_kraken_trade ... ok
+test sequencer::sync_gate::tests::test_drift_check ... ok
+test sequencer::sync_gate::tests::test_latency_check ... ok
+test sequencer::sync_gate::tests::test_staleness_check ... ok
+test governor::superposition::tests::test_benchmark_speed ... ok
+test taleb::omega::tests::test_omega_basic ... ok
+test taleb::omega::tests::test_omega_bearish ... ok
+test governor::genesis::tests::test_audit_pass ... ok
+test taleb::omega::tests::test_omega_bullish ... ok
+test taleb::omega::tests::test_veto_level ... ok
+test taleb::shroud::tests::test_bes_long_breach ... ok
+test taleb::shroud::tests::test_bes_short_breach ... ok
+test taleb::sizing::tests::test_friction_kill ... ok
+test taleb::sizing::tests::test_kelly_positive ... ok
+test taleb::tests::test_black_swan_panic ... ok
+test taleb::tests::test_insolvency_check ... ok
+test taleb::tests::test_jerk_veto ... ok
+test taleb::tests::test_omega_veto_integration ... ok
+test taleb::tests::test_ttl_veto ... ok
+test feynman::tests::test_efficiency_ratio_trend ... ok
+test governor::supervise::tests::test_orchestration ... ok
+test feynman::tests::test_regime_noise ... ok
+test db::state::tests::test_kinetics_pipeline ... FAILED
+test db::state::tests::test_pool_functionality ... ok
+test simons::tests::test_convergence ... ok
+test governor::ooda_loop::tests::test_cycle_latency ... ok
+test execution::limiter::tests::test_token_bucket_throttle ... ok
+test db::state::tests::test_pipeline_benchmark ... ok
+
+failures:
+
+---- db::state::tests::test_kinetics_pipeline stdout ----
+
+thread 'db::state::tests::test_kinetics_pipeline' (2035613) panicked at src/db/state.rs:152:66:
+called `Result::unwrap()` on an `Err` value: Syntax("invalid length 9, expected struct PhysicsState with 10 elements")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    db::state::tests::test_kinetics_pipeline
+
+test result: FAILED. 73 passed; 1 failed; 1 ignored; 0 measured; 0 filtered out; finished in 1.57s
+
+error: test failed, to rerun pass `--lib`

@@ -7,6 +7,7 @@ pub mod brain {
 
 use brain::brain_service_client::BrainServiceClient;
 use brain::StateVector;
+use crate::auditor::truth_envelope::TruthEnvelope; // D-87
 
 pub struct BrainClient {
     client: BrainServiceClient<Channel>,
@@ -40,16 +41,18 @@ impl BrainClient {
 
     pub async fn get_context(
         &mut self,
-        price: f64,
-        velocity: f64,
+        truth: &TruthEnvelope
     ) -> Result<brain::ContextResponse, tonic::Status> {
+        let envelope_json = serde_json::to_string(truth).unwrap_or_default();
+        
         let request = tonic::Request::new(brain::ContextRequest {
-            price,
-            velocity,
+            price: truth.mid_price,
+            velocity: truth.velocity,
             timestamp: std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_millis() as i64,
+            truth_envelope: envelope_json, // D-87
         });
 
         let response = self.client.get_context(request).await?;

@@ -6,6 +6,8 @@ import { shaderMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 import { useMarketStore } from '@/lib/stores/market-store';
 import { useAgentStore } from '@/lib/stores/agent-store';
+import { useSystemStore } from '@/lib/stores/system-store'; // D-81
+import { ReasoningBubble } from './ReasoningBubble'; // D-81
 
 // -----------------------------------------------------------------------------
 // GLSL Shaders
@@ -142,20 +144,65 @@ function WaveMesh() {
             // Rotate around global Y axis (which is local Z because of the -PI/2 X rotation)
             meshRef.current.rotation.z += delta * 0.2;
         }
+
+        // D-84: Track FPS for stress testing
+        updateFPSCounter();
     });
 
     return (
-        <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]}>
-            {/* High segment count for smooth vertex displacement */}
-            <planeGeometry args={[30, 30, 128, 128]} />
-            {/* @ts-ignore */}
-            <waveMaterial
-                ref={materialRef}
-                wireframe={true} // Wireframe looks more "Tactical"
-                transparent={true}
-                side={THREE.DoubleSide}
-            />
-        </mesh>
+        <group>
+            <mesh ref={meshRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, -2, 0]}>
+                {/* High segment count for smooth vertex displacement */}
+                <planeGeometry args={[30, 30, 128, 128]} />
+                {/* @ts-ignore */}
+                <waveMaterial
+                    ref={materialRef}
+                    wireframe={true} // Wireframe looks more "Tactical"
+                    transparent={true}
+                    side={THREE.DoubleSide}
+                />
+            </mesh>
+
+            {/* Directive-81: Reasoning Bubbles */}
+            {/* We map multiple bubbles if they exist. 
+                Position logic:
+                x: Spread out horizontally based on index (simulated time)
+                y: Float above wave
+                z: Slightly randomized depth
+            */}
+            <ReasoningBubblesOverlay />
+        </group>
+    );
+}
+
+function ReasoningBubblesOverlay() {
+    const trace = useSystemStore(s => s.reasoningTrace);
+
+    return (
+        <group position={[0, 0, 0]}>
+            {trace.map((step, i) => {
+                // visual offset: new thoughts appear on right (+x), older on left (-x)
+                // This mimics the "feed" moving left.
+                // We assume the trace is ordered [oldest, ..., newest] 
+                // but usually we want newest on right.
+
+                // Let's assume max 5 items. 
+                // i=0 (oldest) -> x = -4
+                // i=4 (newest) -> x = 4
+
+                const xPos = -4 + (i * 2.5);
+
+                return (
+                    <ReasoningBubble
+                        key={step.id || i}
+                        position={[xPos, 1.5 + (Math.sin(i) * 0.5), (i % 2 === 0 ? 1 : -1)]}
+                        content={step.content}
+                        type={step.type}
+                        probability={step.probability}
+                    />
+                )
+            })}
+        </group>
     );
 }
 
@@ -194,4 +241,32 @@ export function RiemannWave() {
             </div>
         </div>
     );
+}
+
+// D-84: FPS Measurement for Stress Testing
+let fpsFrames = 0;
+let fpsStartTime = performance.now();
+let currentFPS = 0;
+
+export function resetFPSCounter() {
+    fpsFrames = 0;
+    fpsStartTime = performance.now();
+    currentFPS = 0;
+}
+
+export function getCurrentFPS(): number {
+    return currentFPS;
+}
+
+export function updateFPSCounter() {
+    fpsFrames++;
+    const currentTime = performance.now();
+    const elapsed = currentTime - fpsStartTime;
+
+    // Update FPS every second
+    if (elapsed >= 1000) {
+        currentFPS = Math.round((fpsFrames / elapsed) * 1000);
+        fpsFrames = 0;
+        fpsStartTime = currentTime;
+    }
 }

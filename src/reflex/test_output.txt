@@ -1,0 +1,337 @@
+warning: unused import: `std::collections::HashMap`
+  --> src/ingest/kraken.rs:12:5
+   |
+12 | use std::collections::HashMap;
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `FirewallError`
+  --> src/governor/ooda_loop.rs:63:64
+   |
+63 | use crate::auditor::firewall::{Firewall, LlmInferenceResponse, FirewallError};
+   |                                                                ^^^^^^^^^^^^^
+
+warning: unused imports: `ControlMessage`, `MsgFlags`, `UnixAddr`, `recvmsg`, and `sendmsg`
+ --> src/governor/handoff.rs:7:24
+  |
+7 | use nix::sys::socket::{sendmsg, recvmsg, ControlMessage, MsgFlags, UnixAddr};
+  |                        ^^^^^^^  ^^^^^^^  ^^^^^^^^^^^^^^  ^^^^^^^^  ^^^^^^^^
+
+warning: unused import: `info`
+ --> src/governor/rebalancer.rs:2:15
+  |
+2 | use tracing::{info, warn, error};
+  |               ^^^^
+
+warning: unused import: `super::*`
+  --> src/auditor/firewall.rs:88:9
+   |
+88 |     use super::*;
+   |         ^^^^^^^^
+
+warning: unused import: `Heartbeat`
+  --> src/server.rs:11:51
+   |
+11 |     DemoteRequest, RatchetRequest, ConfigPayload, Heartbeat,
+   |                                                   ^^^^^^^^^
+
+warning: unused import: `Duration`
+ --> src/sequencer/sync_gate.rs:1:17
+  |
+1 | use std::time::{Duration, Instant};
+  |                 ^^^^^^^^
+
+warning: unused import: `tracing::warn`
+ --> src/sequencer/sync_gate.rs:2:5
+  |
+2 | use tracing::warn;
+  |     ^^^^^^^^^^^^^
+
+warning: unused variable: `ts`
+  --> src/historian/biopsy.rs:33:17
+   |
+33 |             let ts = packet.timestamp; // Instant is hard to serialize to absolute time without anchor.
+   |                 ^^ help: if this is intentional, prefix it with an underscore: `_ts`
+   |
+   = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: field `current_psi` is never read
+  --> src/governor/wave_legislator.rs:29:5
+   |
+24 | pub struct WaveLegislator {
+   |            -------------- field in this struct
+...
+29 |     current_psi: Complex64,   // Current Wave State (simplified)
+   |     ^^^^^^^^^^^
+   |
+   = note: `#[warn(dead_code)]` (part of `#[warn(unused)]`) on by default
+
+warning: constant `SLIPPAGE_TOLERANCE_BPS` is never used
+ --> src/governor/audit_loop.rs:5:7
+  |
+5 | const SLIPPAGE_TOLERANCE_BPS: f64 = 2.0; // Basis points
+  |       ^^^^^^^^^^^^^^^^^^^^^^
+
+warning: field `latency_threshold_us` is never read
+  --> src/governor/sentinel.rs:25:5
+   |
+22 | pub struct Sentinel {
+   |            -------- field in this struct
+...
+25 |     latency_threshold_us: f64,
+   |     ^^^^^^^^^^^^^^^^^^^^
+
+warning: fields `api_key` and `api_secret` are never read
+  --> src/gateway/order_manager.rs:30:5
+   |
+28 | pub struct OrderGateway {
+   |            ------------ fields in this struct
+29 |     // Configuration
+30 |     api_key: String,
+   |     ^^^^^^^
+31 |     api_secret: String,
+   |     ^^^^^^^^^^
+
+warning: variable `barrier_V` should have a snake case name
+  --> src/governor/wave_legislator.rs:62:9
+   |
+62 |         barrier_V: f64,
+   |         ^^^^^^^^^ help: convert the identifier to snake case (notice the capitalization): `barrier_v`
+   |
+   = note: `#[warn(non_snake_case)]` (part of `#[warn(nonstandard_style)]`) on by default
+
+warning: variable `kinetic_T` should have a snake case name
+  --> src/governor/wave_legislator.rs:75:13
+   |
+75 |         let kinetic_T = velocity.powi(2) * 0.5;
+   |             ^^^^^^^^^ help: convert the identifier to snake case: `kinetic_t`
+
+warning: variable `potential_V` should have a snake case name
+  --> src/governor/wave_legislator.rs:78:13
+   |
+78 |         let potential_V = barrier_V;
+   |             ^^^^^^^^^^^ help: convert the identifier to snake case (notice the capitalization): `potential_v`
+
+   Compiling reflex v0.1.0 (/Users/zishanmalik/voltaire/src/reflex)
+warning: `reflex` (lib) generated 16 warnings (run `cargo fix --lib -p reflex` to apply 9 suggestions)
+warning: unused imports: `OodaResponse`, `PhysicsResponse`, `ReflexServiceServer`, and `ReflexService`
+  --> src/main.rs:19:5
+   |
+19 |     PhysicsResponse, OodaResponse, ReasoningStep, // D-81
+   |     ^^^^^^^^^^^^^^^  ^^^^^^^^^^^^
+20 |     reflex_service_server::{ReflexService, ReflexServiceServer}
+   |                             ^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^
+   |
+   = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused import: `OODAState`
+ --> tests/verify_telemetry.rs:1:59
+  |
+1 | use reflex::governor::ooda_loop::{OODACore, PhysicsState, OODAState};
+  |                                                           ^^^^^^^^^
+  |
+  = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused imports: `Status` and `transport::Server`
+  --> src/main.rs:22:13
+   |
+22 | use tonic::{transport::Server, Status};
+   |             ^^^^^^^^^^^^^^^^^  ^^^^^^
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> tests/verify_telemetry.rs:29:22
+    |
+ 29 |     let state = ooda.orient(physics, None).await; // Negative sentiment simulated by None fallback
+    |                      ^^^^^^          ---- argument #2 of type `u8` is missing
+    |
+note: method defined here
+   --> /Users/zishanmalik/voltaire/src/reflex/src/governor/ooda_loop.rs:111:18
+    |
+111 |     pub async fn orient(&mut self, physics: PhysicsState, regime_id: u8, client: Option<&mut BrainClient>) -> OODAState {
+    |                  ^^^^^^
+help: provide the argument
+    |
+ 29 |     let state = ooda.orient(physics, /* u8 */, None).await; // Negative sentiment simulated by None fallback
+    |                                      +++++++++
+
+For more information about this error, try `rustc --explain E0061`.
+warning: `reflex` (test "verify_telemetry") generated 1 warning
+error: could not compile `reflex` (test "verify_telemetry") due to 1 previous error; 1 warning emitted
+warning: build failed, waiting for other jobs to finish...
+warning: variable does not need to be mutable
+   --> src/main.rs:306:9
+    |
+306 |     let mut staircase_governor = reflex::governor::staircase::Staircase::new();
+    |         ----^^^^^^^^^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+    |
+    = note: `#[warn(unused_mut)]` (part of `#[warn(unused)]`) on by default
+
+warning: variable does not need to be mutable
+   --> src/main.rs:321:9
+    |
+321 |     let mut last_processed_yield = Instant::now();
+    |         ----^^^^^^^^^^^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: variable does not need to be mutable
+   --> src/main.rs:373:9
+    |
+373 |     let mut audit_loop = reflex::governor::audit_loop::AuditLoop::new();
+    |         ----^^^^^^^^^^
+    |         |
+    |         help: remove this `mut`
+
+warning: unused variable: `state_store`
+   --> src/main.rs:108:9
+    |
+108 |     let state_store = match state_store_res {
+    |         ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_state_store`
+    |
+    = note: `#[warn(unused_variables)]` (part of `#[warn(unused)]`) on by default
+
+warning: unused variable: `last_processed_yield`
+   --> src/main.rs:321:9
+    |
+321 |     let mut last_processed_yield = Instant::now();
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_last_processed_yield`
+
+warning: unused variable: `simons_pred`
+   --> src/main.rs:728:13
+    |
+728 |         let simons_pred = simons.forward(state.velocity);
+    |             ^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_simons_pred`
+
+warning: `reflex` (bin "reflex" test) generated 8 warnings (run `cargo fix --bin "reflex" -p reflex --tests` to apply 8 suggestions)
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/feynman.rs:277:20
+    |
+277 |             engine.update(100.0, i as f64);
+    |                    ^^^^^^----------------- argument #3 of type `u64` is missing
+    |
+note: method defined here
+   --> src/feynman.rs:76:12
+    |
+ 76 |     pub fn update(&mut self, price: f64, timestamp: f64, sequence_id: u64) -> PhysicsState {
+    |            ^^^^^^                                        ----------------
+help: provide the argument
+    |
+277 |             engine.update(100.0, i as f64, /* u64 */);
+    |                                          +++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/feynman.rs:297:24
+    |
+297 |         let s = engine.update(110.0, 200.0); // Step from 199->200
+    |                        ^^^^^^-------------- argument #3 of type `u64` is missing
+    |
+note: method defined here
+   --> src/feynman.rs:76:12
+    |
+ 76 |     pub fn update(&mut self, price: f64, timestamp: f64, sequence_id: u64) -> PhysicsState {
+    |            ^^^^^^                                        ----------------
+help: provide the argument
+    |
+297 |         let s = engine.update(110.0, 200.0, /* u64 */); // Step from 199->200
+    |                                           +++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/feynman.rs:322:28
+    |
+322 |             let s = engine.update(price, i as f64);
+    |                            ^^^^^^----------------- argument #3 of type `u64` is missing
+    |
+note: method defined here
+   --> src/feynman.rs:76:12
+    |
+ 76 |     pub fn update(&mut self, price: f64, timestamp: f64, sequence_id: u64) -> PhysicsState {
+    |            ^^^^^^                                        ----------------
+help: provide the argument
+    |
+322 |             let s = engine.update(price, i as f64, /* u64 */);
+    |                                                  +++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/feynman.rs:346:20
+    |
+346 |             engine.update(i as f64, i as f64);
+    |                    ^^^^^^-------------------- argument #3 of type `u64` is missing
+    |
+note: method defined here
+   --> src/feynman.rs:76:12
+    |
+ 76 |     pub fn update(&mut self, price: f64, timestamp: f64, sequence_id: u64) -> PhysicsState {
+    |            ^^^^^^                                        ----------------
+help: provide the argument
+    |
+346 |             engine.update(i as f64, i as f64, /* u64 */);
+    |                                             +++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/feynman.rs:352:24
+    |
+352 |         let s = engine.update(300.0, 300.0);
+    |                        ^^^^^^-------------- argument #3 of type `u64` is missing
+    |
+note: method defined here
+   --> src/feynman.rs:76:12
+    |
+ 76 |     pub fn update(&mut self, price: f64, timestamp: f64, sequence_id: u64) -> PhysicsState {
+    |            ^^^^^^                                        ----------------
+help: provide the argument
+    |
+352 |         let s = engine.update(300.0, 300.0, /* u64 */);
+    |                                           +++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/feynman.rs:363:20
+    |
+363 |             engine.update(i as f64, i as f64);
+    |                    ^^^^^^-------------------- argument #3 of type `u64` is missing
+    |
+note: method defined here
+   --> src/feynman.rs:76:12
+    |
+ 76 |     pub fn update(&mut self, price: f64, timestamp: f64, sequence_id: u64) -> PhysicsState {
+    |            ^^^^^^                                        ----------------
+help: provide the argument
+    |
+363 |             engine.update(i as f64, i as f64, /* u64 */);
+    |                                             +++++++++++
+
+error[E0061]: this method takes 3 arguments but 2 arguments were supplied
+   --> src/feynman.rs:366:24
+    |
+366 |         let s = engine.update(1100.0, 1100.0);
+    |                        ^^^^^^---------------- argument #3 of type `u64` is missing
+    |
+note: method defined here
+   --> src/feynman.rs:76:12
+    |
+ 76 |     pub fn update(&mut self, price: f64, timestamp: f64, sequence_id: u64) -> PhysicsState {
+    |            ^^^^^^                                        ----------------
+help: provide the argument
+    |
+366 |         let s = engine.update(1100.0, 1100.0, /* u64 */);
+    |                                             +++++++++++
+
+error[E0063]: missing field `sequence_id` in initializer of `feynman::PhysicsState`
+   --> src/db/state.rs:131:18
+    |
+131 |         let kp = PhysicsState {
+    |                  ^^^^^^^^^^^^ missing `sequence_id`
+
+error[E0063]: missing field `sequence_id` in initializer of `feynman::PhysicsState`
+   --> src/db/state.rs:161:18
+    |
+161 |         let kp = PhysicsState {
+    |                  ^^^^^^^^^^^^ missing `sequence_id`
+
+Some errors have detailed explanations: E0061, E0063.
+For more information about an error, try `rustc --explain E0061`.
+warning: `reflex` (lib test) generated 8 warnings (8 duplicates)
+error: could not compile `reflex` (lib test) due to 9 previous errors; 8 warnings emitted
+warning: `reflex` (bin "reflex") generated 8 warnings (8 duplicates)

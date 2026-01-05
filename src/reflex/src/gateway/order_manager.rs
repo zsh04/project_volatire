@@ -128,4 +128,13 @@ impl OrderGateway {
         // Return simulated number of closed positions
         1 // Assume 1 position for simulation
     }
+    /// Directive-86: Sovereign Close All
+    /// Calls emergency liquidation to flatten all positions
+    pub async fn close_all_positions(&mut self) -> Result<usize, String> {
+        // In a real implementation, this would iterate active orders and send CancelAll
+        // followed by Market Close orders for all positions.
+        let count = self.emergency_liquidate();
+        tracing::warn!("📛 GATEWAY: Sovereign CloseAll executed. Liquidated {} positions/orders.", count);
+        Ok(count)
+    }
 }

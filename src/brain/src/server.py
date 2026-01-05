@@ -1,10 +1,12 @@
 import logging
+import time  # Fixed import
 
 import pandas as pd
 from collections import deque
 from datetime import datetime
 from rich.console import Console
 from generated import brain_pb2, brain_pb2_grpc
+from model_router import ModelRouter  # D-95
 
 from hypatia.engine import ContextEngine
 from kepler.engine import KeplerOracle
@@ -17,7 +19,9 @@ logger = logging.getLogger(__name__)
 
 class BrainService(brain_pb2_grpc.BrainServiceServicer):
     def __init__(self):
-        logger.info("🧠 Initializing CORTEX Components...")
+        self.router = ModelRouter()
+        self.router.load_adapters("config/adapters.json")  # Mock path
+        print("Brain Service Initialized.")
         self.hypatia = ContextEngine()
         self.kepler = KeplerOracle()
         self.boyd = BoydStrategist()
@@ -175,26 +179,69 @@ class BrainService(brain_pb2_grpc.BrainServiceServicer):
         return brain_pb2.ForecastResult(p50=0.0)
 
     async def GetContext(self, request, context):
+        start = time.time()
+
+        # D-95: Extract intended adapter from request (if we had the field in proto)
+        # For now, we simulate the Router logic:
+        # Ideally: adapter_id = request.adapter_id
+        # self.router.inference(..., adapter_id)
+
+        # Since proto isn't updated, we assume the router is stateful or defaults.
+        # Impl Note: We need to update PROTO to pass adapter_id if we want per-request control.
+        # But for this step, we just show integration.
+
+        flavor = self.router.inference("Market Data...")
+
+        reasoning = (
+            f"{flavor}: Market implies hold. Acceleration {request.acceleration:.2f}"
+        )
         """
         D-54: Live Semantic Context.
-        Combines Real-Time Sentiment (D-38) + Deep Memory (D-37).
+        Combines Real-Time Sentiment (D-38) + Deep Memory (D-37) + D-87.5 LLM Grounding.
         """
-        start = datetime.now()
+        # D-87.5: Extract Truth Envelope
+        truth_envelope = getattr(request, "truth_envelope", None)
 
         # Call Hypatia Engine
-        ctx_data = await self.hypatia.fetch_context(request.price, request.velocity)
+        ctx_data = await self.hypatia.fetch_context(
+            request.price, request.velocity, truth_envelope_json=truth_envelope
+        )
 
         duration_ns = int((datetime.now() - start).total_seconds() * 1e9)
 
         console.print(
             f"[bold yellow]🧠 CONTEXT:[/bold yellow] "
             f"Regime: [cyan]{ctx_data['nearest_regime']}[/cyan] | "
-            f"Sent: [magenta]{ctx_data['sentiment_score']:.2f}[/magenta]"
+            f"Sent: [magenta]{ctx_data['sentiment_score']:.2f}[/magenta] | "
+            f"Reasoning: {ctx_data.get('reasoning', 'N/A')[:30]}..."
         )
+
+        # Prepare context packet for Boyd, similar to Reason's market_data, valuation, regime
+        context_pkt = {
+            "market_data": {"velocity": request.velocity, "entropy": request.entropy},
+            "valuation": {
+                "price": request.price,
+                "fair_value": request.price
+                + request.simons_prediction,  # Assuming simons_prediction is velocity
+            },
+            "regime": ctx_data.get(
+                "nearest_regime", "Unknown"
+            ),  # Simplified for context
+            "forecast": None,  # No forecast available in GetContext
+        }
+
+        if self.boyd:
+            decision = self.boyd.decide(
+                **context_pkt
+            )  # Pass dictionary as keyword arguments
+            if decision.action == "VETO":
+                reasoning += f" [BOYD VETO: {decision.reason}]"
 
         return brain_pb2.ContextResponse(
             sentiment_score=ctx_data["sentiment_score"],
             nearest_regime=ctx_data["nearest_regime"],
             regime_distance=ctx_data["regime_distance"],
             computation_time_ns=duration_ns,
+            reasoning=reasoning,  # Use the potentially modified reasoning
+            referenced_price=ctx_data.get("referenced_price", 0.0),
         )

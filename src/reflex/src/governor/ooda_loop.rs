@@ -34,16 +34,56 @@ pub struct Decision {
     pub confidence: f64,
 }
 
+impl Decision {
+    pub fn default_hold() -> Self {
+        Self {
+            action: Action::Hold,
+            reason: "Default/Fallback Hold".to_string(),
+            confidence: 1.0,
+        }
+    }
+}
+
+impl Default for OODAState {
+    fn default() -> Self {
+        Self {
+            physics: PhysicsState::default(),
+            sentiment_score: None,
+            nearest_regime: None,
+            oriented_at: Instant::now(),
+            trace_id: String::new(),
+        }
+    }
+}
+
 // --- The Governor ---
 
 use crate::governor::provisional::ProvisionalExecutive;
 use crate::brain::veto_gate::VetoGate;
+use crate::auditor::firewall::{Firewall, LlmInferenceResponse, FirewallError};
+use crate::auditor::truth_envelope::TruthEnvelope;
+use crate::auditor::nullifier::Nullifier; // D-88
+use crate::auditor::red_team::RedTeam; // D-93
+use crate::governor::ensemble_manager::EnsembleManager; // D-95
+use crate::governor::health::PhoenixMonitor; // D-96
+
+pub use crate::sequencer::sync_gate::SyncGate;
+use crate::sequencer::shadow_gate::ShadowGate; // D-91
+use crate::gateway::binary_packer::BinaryPacker; // D-94
 
 pub struct OODACore {
     // Mock clients for now. In prod, these would be Redis/LanceDB clients.
     pub jitter_threshold: Duration,
     pub provisional: ProvisionalExecutive,
     pub veto_gate: VetoGate,
+    pub firewall: Firewall, // D-87
+    pub nullifier: Nullifier, // D-88
+    pub red_team: RedTeam, // D-93
+    pub sync_gate: SyncGate, // D-91
+    pub shadow_gate: ShadowGate, // D-92
+    pub binary_packer: BinaryPacker, // D-94
+    pub ensemble_manager: EnsembleManager, // D-95
+    pub phoenix_monitor: PhoenixMonitor, // D-96
     pub forensic_tx: Option<mpsc::Sender<DecisionPacket>>,
     pub mirror_tx: Option<mpsc::Sender<DecisionPacket>>,
     pub decay_tx: Option<mpsc::Sender<DecisionPacket>>,
@@ -61,6 +101,14 @@ impl OODACore {
             jitter_threshold: Duration::from_millis(20),
             provisional: ProvisionalExecutive::new(),
             veto_gate: VetoGate::new(),
+            firewall: Firewall::new(), // D-87
+            nullifier: Nullifier::new(), // D-88
+            red_team: RedTeam::new(), // D-93
+            sync_gate: SyncGate::new(), // D-91
+            shadow_gate: ShadowGate::new(), // D-92
+            binary_packer: BinaryPacker::new(), // D-94
+            ensemble_manager: EnsembleManager::new(), // D-95
+            phoenix_monitor: PhoenixMonitor::new(), // D-96
             forensic_tx,
             mirror_tx,
             decay_tx,
@@ -72,9 +120,14 @@ impl OODACore {
     /// OBSERVE -> ORIENT
     /// Fuses real-time Physics with asynchronous Semantic checks.
     /// Implements "Jitter" Fallback: If Semantics take too long, we proceed with Safety.
+    /// Implements "Cognitive Firewall" (D-87): Validates Brain response against Hard Telemetry.
+    /// Implements "Semantic Nullification" (D-88): Purges corrupted reasoning.
     #[tracing::instrument(skip(self, client))]
-    pub async fn orient(&mut self, physics: PhysicsState, client: Option<&mut BrainClient>) -> OODAState {
+    pub async fn orient(&mut self, physics: PhysicsState, regime_id: u8, client: Option<&mut BrainClient>) -> OODAState {
         let _start = Instant::now();
+        // D-92: Shadow Gate Reality Check
+        // Check for fills on pending virtual orders against current physics price
+        self.shadow_gate.check_fills(physics.price);
         
         // Capture TraceID from current span
         let span = tracing::Span::current();
@@ -84,12 +137,82 @@ impl OODACore {
         // 1. Asynchronous Fetch Logic
         let (sentiment, regime) = if let Some(c) = client {
             // LIVE PATH (D-54)
+            // D-87: COGNITIVE FIREWALL - Construct Truth Envelope
+            let mut truth = TruthEnvelope {
+                timestamp: physics.timestamp,
+                velocity: physics.velocity,
+                acceleration: physics.acceleration,
+                jerk: physics.jerk,
+                sentiment_score: 0.0, // Initial seed
+                mid_price: physics.price,
+                bid_ask_spread: 0.0, // TODO: Ingest spread
+                regime_id,
+                sequence_id: 0,      // TODO: Pass sequence_id
+            };
+            
+            // D-93: ADVERSARIAL STRESS INJECTION (The Red-Teamer)
+            // We mutate the Envelope BEFORE sending to Brain or verifying.
+            self.red_team.inject_chaos(&mut truth);
+
+            // D-95: THE CHAMELEON (Multi-Regime Ensemble)
+            // 1. Identify Target Adapter from PREVIOUS Regime (or best guess)
+            // Note: In a real loop, we'd use the regime from the LAST cycle to pick the adapter for THIS cycle,
+            // or use a "Fast" regime classifier here.
+            // For now, we update based on the passed `regime_id` (assuming it came from heavy DB lookup or cache).
+            let current_regime_name = match regime_id {
+                0 => "Laminar",
+                4 => "Turbulent",
+                5 => "Violent",
+                _ => "Unknown",
+            };
+            self.ensemble_manager.update_regime(current_regime_name);
+            let active_adapter = self.ensemble_manager.get_active_adapter();
+
+            // TODO: Pass `active_adapter` to client.get_context()
+            // For now, we just log it in the trace context or debug 
+            // tracing::debug!("Using Adapter: {}", active_adapter);
+            
             // Enforce Jitter Budget (e.g., 20ms) via Timeout
             match tokio::time::timeout(
                 self.jitter_threshold,
-                c.get_context(physics.price, physics.velocity)
+                c.get_context(&truth) // Pass Truth Envelope
             ).await {
-                Ok(Ok(ctx)) => (Some(ctx.sentiment_score), Some(ctx.nearest_regime)),
+                Ok(Ok(ctx)) => {
+                    // D-91: TEMPORAL SYNC-GATE
+                    // 1. Latency Check (Atomic Clock)
+                    if let Err(e) = self.sync_gate.measure_latency(_start) {
+                        tracing::warn!("BTC-91 SyncGate Violation (Latency): {:?}", e);
+                        (None, None)
+                    } else {
+                        // Map Proto ContextResponse to LlmInferenceResponse for validation
+                        // We treat context info as "inference" for validation purposes
+                        let llm_resp = LlmInferenceResponse {
+                            reasoning: ctx.reasoning.clone(), 
+                            decision: "CONTEXT".to_string(),
+                            confidence: 1.0,
+                            referenced_price: if ctx.referenced_price > 0.0 { Some(ctx.referenced_price) } else { None },
+                            regime_classification: Some(ctx.nearest_regime.clone()),
+                        };
+
+                    match self.firewall.validate(&llm_resp, &truth) {
+                        Ok(_) => {
+                            self.nullifier.reset_continuity(); // D-88: Success resets counter
+                            (Some(ctx.sentiment_score), Some(ctx.nearest_regime))
+                        },
+                        Err(e) => {
+                            // D-88: NULLIFICATION "THE ERASER"
+                            let triggered_amr = self.nullifier.nullify(e, ctx.reasoning.clone());
+                            if triggered_amr {
+                                tracing::warn!("⚡ AMR: BRAIN RESET REQUESTED");
+                                // TODO: Actually trigger reset callback or signal if needed here
+                            }
+                            
+                            // Return BLIND STATE (Nullified)
+                            (None, None) 
+                        }
+                    }
+                } // End SyncGate Else
+                },
                 Ok(Err(e)) => {
                     tracing::warn!("Brain Error: {}", e);
                     (None, None) // Error -> Blind
@@ -105,9 +228,21 @@ impl OODACore {
         };
 
         // 2. Final Jitter Check (Redundant if timeout works, but good for local processing tracking)
-        // If we spent > threshold just on overhead, we might still want to skip? 
-        // But for now, we trust the result if we got it.
-
+        let loop_latency = _start.elapsed();
+        
+        // D-96: METABOLIC CHECK (Phoenix Monitor)
+        use crate::governor::health::HealthStatus;
+        match self.phoenix_monitor.check_vitals(loop_latency) {
+            HealthStatus::Critical(msg) => {
+                tracing::error!("🔥 PHOENIX CRITICAL: {}", msg);
+                self.phoenix_monitor.initiate_handoff();
+            },
+            HealthStatus::Degraded(msg) => {
+                tracing::warn!("⚠️ PHOENIX WARNING: {}", msg);
+            },
+            HealthStatus::Healthy => {}
+        }
+        
         OODAState {
             physics,
             sentiment_score: sentiment,
@@ -267,7 +402,36 @@ impl OODACore {
 
     /// DECIDE -> ACT
     /// Atomic execution (mocked)
-    pub fn act(&self, decision: Decision) {
+    pub fn act(&mut self, decision: Decision, current_price: f64) {
+         // D-92: Shadow Mode Hook
+         // We submit every decision to the Shadow Gate for virtual execution
+         self.shadow_gate.submit_order(&decision, current_price);
+         
+         // D-94: ADAPTIVE LATENCY HARVEST (The Shortcut)
+         // Hot-Path Zero-Copy Serialization
+         match decision.action {
+             Action::Buy(qty) => {
+                 // D-94 Part C: Late-Check Veto
+                 if self.sync_gate.check_late_l1(current_price) {
+                     let _packet = self.binary_packer.pack_buy(current_price, qty);
+                     // In prod: unsafe { socket.send(_packet) };
+                     // tracing::info!("⚡ SENT BINARY BUY: {} bytes", _packet.len());
+                 } else {
+                     tracing::warn!("⛔ D-94 PRE-FLIGHT ABORT: Price Moved");
+                 }
+             },
+             Action::Sell(qty) => {
+                 if self.sync_gate.check_late_l1(current_price) {
+                     let _packet = self.binary_packer.pack_sell(current_price, qty);
+                     // In prod: unsafe { socket.send(_packet) };
+                     // tracing::info!("⚡ SENT BINARY SELL: {} bytes", _packet.len());
+                 } else {
+                     tracing::warn!("⛔ D-94 PRE-FLIGHT ABORT: Price Moved");
+                 }
+             },
+             _ => {}
+         }
+
         if let Action::Halt = decision.action {
             // In prod: Panic / Kill Switch
             println!("!!! SYSTEM SUPER-HALT !!!");
@@ -298,7 +462,7 @@ mod tests {
         };
 
         // Standard Orient (Simulated)
-        let state = core.orient(physics, None).await;
+        let state = core.orient(physics, 0, None).await;
         
         // Decide
         let decision = core.decide(&state);
@@ -357,9 +521,9 @@ mod tests {
         let start = Instant::now();
         for _ in 0..10_000 {
             // Using logic internal simulation for speed test
-            let state = core.orient(physics.clone(), None).await;
+            let state = core.orient(physics.clone(), 0, None).await;
             let dec = core.decide(&state);
-            core.act(dec);
+            core.act(dec, physics.price);
         }
         let total = start.elapsed();
         let per_op = total / 10_000;

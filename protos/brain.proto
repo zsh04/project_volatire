@@ -25,6 +25,8 @@ message ContextRequest {
     double price = 1;
     double velocity = 2; // For finding similar kinematic regimes
     int64 timestamp = 3;
+    // D-87 Firewall: Hard Telemetry Injection
+    string truth_envelope = 4; 
 }
 
 message ContextResponse {
@@ -32,6 +34,9 @@ message ContextResponse {
     string nearest_regime = 2; // "Liquidity Crisis 2020" (D-37)
     double regime_distance = 3; // Vector distance
     int64 computation_time_ns = 4;
+    // D-87: Firewall Fields (Optional)
+    string reasoning = 5; 
+    double referenced_price = 6;
 }
 
 message Empty {}

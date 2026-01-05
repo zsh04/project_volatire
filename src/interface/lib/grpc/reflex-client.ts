@@ -2,6 +2,7 @@ import { ReflexServiceClient } from './generated/ReflexServiceClientPb';
 import { Empty, PhysicsResponse, OODAResponse, VetoRequest } from './generated/reflex_pb';
 import { useMarketStore } from '../stores/market-store';
 import { useAgentStore } from '../stores/agent-store';
+import { useSystemStore } from '../stores/system-store';
 
 // ==============================================================================
 // Client Configuration
@@ -59,6 +60,9 @@ export class TelemetryStream {
                     efficiencyIndex: response.getEfficiencyIndex(),
                     timestamp: response.getTimestamp(),
                 });
+
+                // D-90: Update System Sanity Score
+                useSystemStore.getState().setSystemSanityScore(response.getSystemSanityScore());
 
                 // Compute Riemann state from efficiency index
                 const efficiency = response.getEfficiencyIndex();
