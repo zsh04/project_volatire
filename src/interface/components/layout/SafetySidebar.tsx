@@ -26,7 +26,7 @@ export function SafetySidebar() {
                 <Shield className="w-5 h-5" />
             </div>
 
-            {/* Vertical Staircase */}
+            {/* Vertical Tiered Position Scaling */}
             <div className="flex-1 flex flex-col-reverse justify-center gap-1 w-full px-2">
                 {RISKS.map((risk) => {
                     const isCap = manualRiskCap === risk.id;

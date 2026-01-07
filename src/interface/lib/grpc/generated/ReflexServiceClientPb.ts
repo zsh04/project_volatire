@@ -211,6 +211,28 @@ export class ReflexServiceClient {
     this.methodDescriptorDemoteProvisional);
   }
 
+  methodDescriptorGetTickHistory = new grpcWeb.MethodDescriptor(
+    '/reflex.ReflexService/GetTickHistory',
+    grpcWeb.MethodType.SERVER_STREAMING,
+    reflex_pb.TickHistoryRequest,
+    reflex_pb.PhysicsResponse,
+    (request: reflex_pb.TickHistoryRequest) => {
+      return request.serializeBinary();
+    },
+    reflex_pb.PhysicsResponse.deserializeBinary
+  );
+
+  getTickHistory(
+    request: reflex_pb.TickHistoryRequest,
+    metadata?: grpcWeb.Metadata): grpcWeb.ClientReadableStream<reflex_pb.PhysicsResponse> {
+    return this.client_.serverStreaming(
+      this.hostname_ +
+        '/reflex.ReflexService/GetTickHistory',
+      request,
+      metadata || {},
+      this.methodDescriptorGetTickHistory);
+  }
+
   methodDescriptorInitiateIgnition = new grpcWeb.MethodDescriptor(
     '/reflex.ReflexService/InitiateIgnition',
     grpcWeb.MethodType.UNARY,
@@ -252,6 +274,49 @@ export class ReflexServiceClient {
     request,
     metadata || {},
     this.methodDescriptorInitiateIgnition);
+  }
+
+  methodDescriptorUpdateLegislation = new grpcWeb.MethodDescriptor(
+    '/reflex.ReflexService/UpdateLegislation',
+    grpcWeb.MethodType.UNARY,
+    reflex_pb.LegislativeUpdate,
+    reflex_pb.Ack,
+    (request: reflex_pb.LegislativeUpdate) => {
+      return request.serializeBinary();
+    },
+    reflex_pb.Ack.deserializeBinary
+  );
+
+  updateLegislation(
+    request: reflex_pb.LegislativeUpdate,
+    metadata?: grpcWeb.Metadata | null): Promise<reflex_pb.Ack>;
+
+  updateLegislation(
+    request: reflex_pb.LegislativeUpdate,
+    metadata: grpcWeb.Metadata | null,
+    callback: (err: grpcWeb.RpcError,
+               response: reflex_pb.Ack) => void): grpcWeb.ClientReadableStream<reflex_pb.Ack>;
+
+  updateLegislation(
+    request: reflex_pb.LegislativeUpdate,
+    metadata?: grpcWeb.Metadata | null,
+    callback?: (err: grpcWeb.RpcError,
+               response: reflex_pb.Ack) => void) {
+    if (callback !== undefined) {
+      return this.client_.rpcCall(
+        this.hostname_ +
+          '/reflex.ReflexService/UpdateLegislation',
+        request,
+        metadata || {},
+        this.methodDescriptorUpdateLegislation,
+        callback);
+    }
+    return this.client_.unaryCall(
+    this.hostname_ +
+      '/reflex.ReflexService/UpdateLegislation',
+    request,
+    metadata || {},
+    this.methodDescriptorUpdateLegislation);
   }
 
   methodDescriptorTriggerRatchet = new grpcWeb.MethodDescriptor(

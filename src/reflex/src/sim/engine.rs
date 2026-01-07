@@ -2,13 +2,21 @@ use crate::feynman::PhysicsEngine;
 use crate::taleb::{RiskGuardian, TradeProposal, RiskVerdict};
 use crate::ledger::AccountState;
 use crate::sim::ticker::SimTicker;
-// use crate::brain_proto::StrategyIntent; // Unused
 use opentelemetry::{global, KeyValue};
 use opentelemetry::metrics::{Counter, UpDownCounter};
 use futures_util::StreamExt;
 use std::time::Instant;
+use rand::Rng; // Added for Jitter
 
-
+// D-101: FIFO Queue State
+struct OrderState {
+    id: String,
+    side: String,
+    qty: f64,
+    price: f64,
+    queue_pos: f64, // Volume ahead of us
+    placed_at_ts: f64, // When it enters the book (after latency)
+}
 
 pub struct SimulationEngine {
     physics: PhysicsEngine,
@@ -16,6 +24,9 @@ pub struct SimulationEngine {
     ledger: AccountState,
     ticker: SimTicker,
     auditor: crate::audit::QuestBridge,
+    // D-101: Sim Hardening Flags
+    pub pessimistic: bool, 
+    pending_orders: Vec<OrderState>,
     // Metrics
     signal_counter: Counter<u64>,
     trade_counter: Counter<u64>,
@@ -29,14 +40,16 @@ impl SimulationEngine {
         let trade_counter = meter.u64_counter("alpha.trade.count").init();
         let nav_gauge = meter.f64_up_down_counter("portfolio.nav").init();
 
-        let ticker = SimTicker::new(db_url).await?; // Initialize Ticker
+        let ticker = SimTicker::new(db_url).await?; 
 
         Ok(Self {
             physics: PhysicsEngine::new(2000), 
             guardian: RiskGuardian::new(),
             ledger: AccountState::new(100_000.0, 0.0), 
             ticker,
-            auditor, 
+            auditor,
+            pessimistic: false, // Default to Optimistic
+            pending_orders: Vec::new(),
             signal_counter,
             trade_counter,
             nav_gauge,
@@ -44,14 +57,19 @@ impl SimulationEngine {
 
     }
 
-    pub async fn run(mut self, start_ts: i64, end_ts: i64, speed: f64) -> Result<(), Box<dyn std::error::Error>> {
+    pub fn set_pessimistic(&mut self, enabled: bool) {
+        self.pessimistic = enabled;
+        println!("⚙️ Simulation Mode: {}", if self.pessimistic { "PESSIMISTIC (FIFO + Latency)" } else { "OPTIMISTIC (Instant Fill)" });
+    }
+
+    pub async fn run(mut self, start_ts: i64, end_ts: i64, speed: f64) -> Result<f64, Box<dyn std::error::Error>> {
         println!("🚀 Starting SHADOW SIMULATION: {} to {} (Speed: {:.1}x)", start_ts, end_ts, speed);
         
         // Sim State
         let mut sim_stream = self.ticker.stream_history("BTC-USDT", start_ts, end_ts).await?;
         let mut count = 0;
         let start_time = Instant::now();
-        let mut _last_price = 0.0; // Fixed warning
+        let mut _last_price = 0.0; 
         
         let sim_start_ms = start_ts as f64; 
 
@@ -77,6 +95,64 @@ impl SimulationEngine {
 
                     // 1. Update Physics
                     let state = self.physics.update(tick.price, tick.timestamp, 0);
+
+                    // --- D-101: Pessimistic Fill Logic (FIFO Queue) ---
+                    // Process Pending Orders BEFORE generating new ones
+                    // --- D-101: Pessimistic Fill Logic (FIFO Queue) ---
+                    // Process Pending Orders BEFORE generating new ones
+                    // In pessimistic mode, we only fill if we drained the queue.
+                    if self.pessimistic {
+                        let mut filled_indices = Vec::new();
+                        let mut fills_to_log = Vec::new();
+                        
+                        for (i, order) in self.pending_orders.iter_mut().enumerate() {
+                            // Check latency condition (has order reached the "exchange"?)
+                            if tick.timestamp >= order.placed_at_ts {
+                                // Check Price match
+                                let price_match = if order.side == "LONG" { tick.price <= order.price } else { tick.price >= order.price };
+                                
+                                if price_match {
+                                    // Decrement FIFO Queue
+                                    order.queue_pos -= tick.quantity;
+                                    
+                                    if order.queue_pos <= 0.0 {
+                                        // FILL!
+                                        self.trade_counter.add(1, &[KeyValue::new("side", order.side.clone())]);
+                                        self.nav_gauge.add(order.qty * tick.price, &[KeyValue::new("type", "exposure_add")]);
+                                        self.ledger.update_fill(&order.side, tick.price, order.qty); 
+                                        
+                                        // Buffer Log
+                                        use crate::audit::FrictionLog;
+                                        let log = FrictionLog {
+                                            ts: Some((tick.timestamp as i64) * 1_000_000), 
+                                            symbol: "BTC-USDT".to_string(),
+                                            order_id: order.id.clone(),
+                                            side: order.side.clone(),
+                                            intent_qty: order.qty,
+                                            fill_price: tick.price, 
+                                            slippage_bps: 5.0, 
+                                            gas_usd: 0.0,
+                                            realized_pnl: 0.0,
+                                            fee_native: 0.0,
+                                            tax_buffer: 0.0,
+                                        };
+                                        fills_to_log.push(log);
+                                        filled_indices.push(i);
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Log Flush
+                        for log in fills_to_log {
+                             self.auditor.log(log);
+                        }
+
+                        // Remove filled
+                        for i in filled_indices.into_iter().rev() {
+                            self.pending_orders.remove(i);
+                        }
+                    }
                     
                     // 2. Mock Brain Intent
                     let action = if state.velocity > 0.0 { "LONG" } else { "HOLD" };
@@ -104,32 +180,48 @@ impl SimulationEngine {
                         
                         match verdict {
                             RiskVerdict::Allowed => {
-                                // Metric: Trade Executed
-                                self.trade_counter.add(1, &[KeyValue::new("side", "LONG")]);
-                                
-                                // Metric: NAV (Mock update for demonstration, usually updated by Ledger)
-                                // self.nav_gauge.add(self.ledger.equity(), &[]); // UpDownCounter adds delta, not absolute. Use ObservableGauge for absolute.
-                                // For UpDownCounter, we'd need to track delta. 
-                                // Let's just track "Trade Value" for now.
-                                self.nav_gauge.add(intent.qty * tick.price, &[KeyValue::new("type", "exposure_add")]);
+                                if self.pessimistic {
+                                    // D-101: Queue It Up (Don't Fill Yet)
+                                    // 1. Calculate Network Latency (20-150ms)
+                                    let mut rng = rand::thread_rng();
+                                    let latency_ms: f64 = rng.gen_range(20.0..150.0);
+                                    
+                                    // 2. Queue Position
+                                    let queue_pos = tick.quantity;
 
-                                // --- D-25B: Friction Logging ---
-                                // Log to QuestDB via Auditor
-                                use crate::audit::FrictionLog;
-                                let log = FrictionLog {
-                                    ts: Some(now * 1_000_000), // ms -> nanos
-                                    symbol: "BTC-USDT".to_string(),
-                                    order_id: format!("SIM-{}", count),
-                                    side: intent.side.clone(),
-                                    intent_qty: intent.qty,
-                                    fill_price: tick.price, // Zero slippage logic
-                                    slippage_bps: 0.0,
-                                    gas_usd: 0.0,
-                                    realized_pnl: 0.0,
-                                    fee_native: 0.0,
-                                    tax_buffer: 0.0,
-                                };
-                                self.auditor.log(log);
+                                    let order = OrderState {
+                                        id: format!("SIM-{}", count),
+                                        side: intent.side.clone(),
+                                        qty: intent.qty,
+                                        price: tick.price, 
+                                        queue_pos,
+                                        placed_at_ts: tick.timestamp + latency_ms,
+                                    };
+                                    self.pending_orders.push(order);
+
+                                } else {
+                                    // D-101 OPTIMISTIC: Instant Fill
+                                    self.trade_counter.add(1, &[KeyValue::new("side", "LONG")]);
+                                    self.nav_gauge.add(intent.qty * tick.price, &[KeyValue::new("type", "exposure_add")]);
+                                    self.ledger.update_fill(&intent.side, tick.price, intent.qty);
+                                    
+                                    // Inline Log (Optimistic)
+                                    use crate::audit::FrictionLog;
+                                    let log = FrictionLog {
+                                        ts: Some(now * 1_000_000), 
+                                        symbol: "BTC-USDT".to_string(),
+                                        order_id: format!("SIM-{}", count),
+                                        side: intent.side.clone(),
+                                        intent_qty: intent.qty,
+                                        fill_price: tick.price, 
+                                        slippage_bps: 0.0, // Optimistic = 0 slippage
+                                        gas_usd: 0.0,
+                                        realized_pnl: 0.0,
+                                        fee_native: 0.0,
+                                        tax_buffer: 0.0,
+                                    };
+                                    self.auditor.log(log);
+                                }
                             },
                             RiskVerdict::Veto(_reason) => {},
                             _ => {}
@@ -148,7 +240,9 @@ impl SimulationEngine {
         
         let duration = start_time.elapsed();
         println!("\n🏁 Simulation Complete.");
-        println!("📊 Stats: {} ticks processed in {:.2}s", count, duration.as_secs_f64());
-        Ok(())
+        let final_equity = self.ledger.total_equity(_last_price);
+        println!("📊 Stats: {} ticks processed in {:.2}s. Final NAV: ${:.2}", count, duration.as_secs_f64(), final_equity);
+        Ok(final_equity)
     }
 }
+

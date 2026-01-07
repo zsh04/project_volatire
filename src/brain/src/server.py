@@ -123,6 +123,7 @@ class BrainService(brain_pb2_grpc.BrainServiceServicer):
             valuation=valuation,
             regime=regime.to_dict() if hasattr(regime, "to_dict") else vars(regime),
             forecast=forecast,
+            legislative_bias=getattr(request, "legislative_bias", "NEUTRAL"),  # D-107
         )
 
         # Log Decision
@@ -177,6 +178,32 @@ class BrainService(brain_pb2_grpc.BrainServiceServicer):
     async def Forecast(self, request, context):
         # Allow direct forecast requests (bypass Boyd)
         return brain_pb2.ForecastResult(p50=0.0)
+
+    async def AddMemoryCheckpoint(self, request, context):
+        """
+        D-102: Saves Episodic Memory (Trade/Veto)
+        """
+        try:
+            checkpoint = {
+                "timestamp": request.timestamp,
+                "type": request.type,
+                "payload": request.payload,
+                "outcome": request.outcome,
+                "venue": request.venue,
+                "vector_text": request.vector_text,
+            }
+            # Use Hypatia's Memory Engine
+            # Note: We need to ensure logic runs in thread/async properly if blocking
+            # but lancedb add is reasonably fast.
+            self.hypatia.memory_engine.add_episodic(checkpoint)
+
+            console.print(
+                f"[bold green]💾 MEMORY:[/bold green] Checkpoint ({request.type}) saved."
+            )
+            return brain_pb2.Ack(success=True, message="Checkpoint Saved")
+        except Exception as e:
+            logger.error(f"Checkpoint Error: {e}")
+            return brain_pb2.Ack(success=False, message=str(e))
 
     async def GetContext(self, request, context):
         start = time.time()

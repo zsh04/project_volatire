@@ -15,8 +15,14 @@ service ReflexService {
   // 4. Demote Provisional (Safety Staircase)
   rpc DemoteProvisional (DemoteRequest) returns (Ack);
 
+  // D-106: Forensic Time Machine
+  rpc GetTickHistory (TickHistoryRequest) returns (stream PhysicsResponse);
+
   // D-83: Initiate Ignition
   rpc InitiateIgnition (Empty) returns (Ack);
+
+  // D-107: Turn Key (Update Legislation)
+  rpc UpdateLegislation (LegislativeUpdate) returns (Ack);
 
   // --- Legacy / Aux ---
   // Force a risk level change
@@ -28,6 +34,12 @@ service ReflexService {
 }
 
 // --- Messages ---
+
+message TickHistoryRequest {
+    string symbol = 1;
+    double start_time = 2; // Unix ms
+    double end_time = 3;   // Unix ms
+}
 
 message PhysicsResponse {
     double price = 1;
@@ -45,6 +57,8 @@ message PhysicsResponse {
     double unrealized_pnl = 8;
     double equity = 9;
     double balance = 10;
+    double realized_pnl = 23;
+    double btc_position = 24;
     
     // Model Telemetry
     double gemma_tokens_per_sec = 11;
@@ -70,6 +84,29 @@ message PhysicsResponse {
     
     // D-90: Recursive Risk Re-balancer Fidelity
     double system_sanity_score = 22;
+    
+    // Directive-105: The Fiscal Control Deck
+    repeated PositionState positions = 25;
+    repeated OrderState orders = 26;
+}
+
+message PositionState {
+    string symbol = 1;
+    double net_size = 2;
+    double avg_entry_price = 3;
+    double unrealized_pnl = 4; // Calculated live
+    int64 entry_timestamp = 5; // Unix ms
+    double current_price = 6;
+}
+
+message OrderState {
+    string order_id = 1;
+    string symbol = 2;
+    string side = 3; // BUY/SELL
+    double quantity = 4;
+    double limit_price = 5;
+    string status = 6; // OPEN, FILLED, CANCELLED
+    int64 timestamp = 7;
 }
 
 message ReasoningStep {
@@ -107,6 +144,21 @@ message RatchetRequest {
   }
   Level level = 1;
   string reason = 2;
+}
+
+message LegislativeUpdate {
+  // Strategic Bias (The Director)
+  string bias = 1; // "NEUTRAL", "LONG_ONLY", "SHORT_ONLY"
+  
+  // Risk Scaling
+  double aggression = 2; // 0.0 - 2.0 (Fidelity Multiplier)
+  
+  // Tactical Overrides
+  bool maker_only = 3;
+  bool hibernation = 4; // READ_ONLY mode
+  
+  // Command
+  bool snap_to_breakeven = 5;
 }
 
 message ConfigPayload {

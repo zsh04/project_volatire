@@ -54,15 +54,17 @@ impl SimTicker {
     /// Stream historical trades.
     /// L1: Check QuestDB.
     /// L3: If missing, failover to R2 Parquet Stream.
+    /// Stream historical trades.
+    /// L1: Check QuestDB.
+    /// L3: If missing, failover to R2 Parquet Stream.
     pub async fn stream_history(
-        self,
+        &self,
         symbol: &str,
         start_ts: i64, 
         end_ts: i64
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<Tick, Box<dyn std::error::Error + Send + Sync + 'static>>> + Send>>, Box<dyn std::error::Error>> {
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Tick, Box<dyn std::error::Error + Send + Sync + 'static>>> + Send + '_>>, Box<dyn std::error::Error>> {
         
         // 1. L1 Check: Do we have data?
-        // We'll peek at the count. A count query is usually fast in QuestDB.
         let check_query = format!(
             "SELECT count() FROM ohlcv_1min WHERE symbol = '{}' AND ts BETWEEN '{}' AND '{}'",
             symbol,
@@ -88,11 +90,11 @@ impl SimTicker {
     }
 
     async fn stream_from_quest(
-        self,
+        &self,
         symbol: &str,
         start_ts: i64,
         end_ts: i64
-    ) -> Result<Pin<Box<dyn Stream<Item = Result<Tick, Box<dyn std::error::Error + Send + Sync + 'static>>> + Send>>, Box<dyn std::error::Error>> {
+    ) -> Result<Pin<Box<dyn Stream<Item = Result<Tick, Box<dyn std::error::Error + Send + Sync + 'static>>> + Send + '_>>, Box<dyn std::error::Error>> {
         let query = format!(
             "SELECT ts, close, volume 
              FROM ohlcv_1min 
@@ -103,14 +105,12 @@ impl SimTicker {
             to_quest_timestamp(end_ts)
         );
         
-        // We have to clone client or keep self alive. 
-        // Ideally SimTicker shouldn't consume self, but the signature consumes self.
-        // Let's adapt to fit the signature.
+        // Use reference to client (via &self)
         let stream = self.client.query_raw(&query, std::iter::empty::<&str>()).await?;
 
         let tick_stream = stream
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)
-            .map_ok(|row| {
+            .map_ok(|row: tokio_postgres::Row| {
                 let ts: SystemTime = row.get(0);
                 let price: f64 = row.get(1);
                 let volume: f64 = row.get(2);
@@ -127,7 +127,7 @@ impl SimTicker {
     }
 
     async fn stream_from_r2(
-        self,
+        &self,
         r2: Arc<dyn ObjectStore>,
         symbol: &str,
         start_ts: i64,

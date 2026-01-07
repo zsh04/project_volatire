@@ -6,12 +6,18 @@ import { cn } from '../../lib/utils';
 
 export function ForensicScrub() {
     const {
-        scrubMode,
-        setScrubMode,
-        scrubTimestamp,
-        setScrubTimestamp,
+        replay,
+        setReplay,
         forensicEvents
-    } = useSystemStore();
+    } = useSystemStore(state => ({
+        replay: state.replay,
+        setReplay: state.setReplay,
+        forensicEvents: state.forensicEvents
+    }));
+
+    const { isReplaying: scrubMode, replayTime: scrubTimestamp } = replay;
+    const setScrubMode = (val: boolean) => setReplay({ isReplaying: val });
+    const setScrubTimestamp = (val: number | null) => setReplay({ replayTime: val || 0 });
 
     const [hoverTime, setHoverTime] = useState<number | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);

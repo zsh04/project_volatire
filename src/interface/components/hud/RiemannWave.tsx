@@ -6,6 +6,18 @@ import { OrbitControls, Sphere, MeshDistortMaterial } from '@react-three/drei';
 import * as THREE from 'three';
 import { useSystemStore } from '@/lib/stores/system-store';
 
+function DriftIndicator() {
+    const drift = useSystemStore(state => state.audit.driftScore);
+    const gapPct = (drift * 100).toFixed(3);
+    const color = drift > 0.1 ? 'text-red-500' : drift > 0.05 ? 'text-amber-500' : 'text-emerald-500';
+
+    return (
+        <span className={`text-xs font-mono font-bold ${color}`}>
+            {drift > 0 ? '+' : ''}{gapPct}%
+        </span>
+    );
+}
+
 /**
  * Directive-UX: Kinetic Core (Riemann Wave)
  * 
@@ -78,6 +90,11 @@ export function RiemannWave() {
         <div className="w-full h-full relative">
             <div className="absolute top-4 left-4 z-10 pointer-events-none">
                 <h3 className="text-xs font-mono font-bold text-white/40 tracking-widest uppercase">KINETIC CORE</h3>
+                {/* D-106 Alpha Gap Overlay */}
+                <div className="mt-1 flex items-center gap-2">
+                    <span className="text-[10px] text-white/30 font-mono">ALPHA GAP (DRIFT)</span>
+                    <DriftIndicator />
+                </div>
             </div>
 
             <Canvas camera={{ position: [0, 0, 4], fov: 45 }}>

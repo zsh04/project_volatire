@@ -12,6 +12,34 @@ export interface SystemNode {
     lastHeartbeat: number;
 }
 
+export interface ReasoningEvent {
+    id: string;
+    author: 'SOROS' | 'TALEB' | 'GOVERNOR' | 'CHRONOS';
+    content: string;
+    timestamp: number;
+    status: 'active' | 'nullified' | 'consensus';
+    confidence: number;
+}
+
+export interface Position {
+    symbol: string;
+    netSize: number;
+    avgEntryPrice: number;
+    unrealizedPnl: number;
+    entryTimestamp: number;
+    currentPrice: number;
+}
+
+export interface Order {
+    orderId: string;
+    symbol: string;
+    side: string;
+    quantity: number;
+    limitPrice: number;
+    status: string;
+    timestamp: number;
+}
+
 interface SystemStore {
     nodes: Record<string, SystemNode>;
 
@@ -46,15 +74,29 @@ interface SystemStore {
     };
     updateVenue: (updates: Partial<SystemStore['venue']>) => void;
 
-    // Finance (Directive-72)
+    // D-105: Fiscal Control Deck (Finance Slice)
     finance: {
         unrealizedPnl: number;
+        realizedPnl: number;
         equity: number;
         balance: number;
+        btcPosition: number;
+        equityHistory: number[];
+        positions: Position[];
+        orders: Order[];
+    };
+    // D-106: Time Machine
+    replay: {
+        isReplaying: boolean;
+        replayTime: number;
+        replaySpeed: number;
+        startTime: number;
+        endTime: number;
     };
     updateFinance: (updates: Partial<SystemStore['finance']>) => void;
+    setReplay: (updates: Partial<SystemStore['replay']>) => void;
 
-    // Kill Switch
+    // Venue Sentry (Directive-67)
     isHalted: boolean;
     setHalted: (halted: boolean) => void;
 
@@ -73,6 +115,19 @@ interface SystemStore {
     // D-90: Governor Sanity
     systemSanityScore: number;
     setSystemSanityScore: (score: number) => void;
+
+    // D-103: Live Reasoning Stream
+    reasoningTrace: ReasoningEvent[];
+    addReasoningEvent: (event: ReasoningEvent) => void;
+
+    // D-107: Legislation
+    legislation: {
+        bias: 'NEUTRAL' | 'LONG_ONLY' | 'SHORT_ONLY';
+        aggression: number;
+        makerOnly: boolean;
+        hibernation: boolean;
+    };
+    updateLegislation: (updates: Partial<SystemStore['legislation']>) => void;
 }
 
 export interface ForensicEvent {
@@ -96,63 +151,63 @@ export const useSystemStore = create<SystemStore>((set) => ({
             id: 'reflex',
             name: 'REFLEX KERNEL',
             type: 'kernel',
-            status: 'online',
+            status: 'offline',
             metricLabel: 'Uptime',
-            metricValue: '04:20:00',
+            metricValue: '---',
             latency: 0,
-            lastHeartbeat: Date.now(),
+            lastHeartbeat: 0,
         },
         kepler: {
             id: 'kepler',
             name: 'KEPLER',
             type: 'service',
-            status: 'online',
+            status: 'offline',
             metricLabel: 'Universe',
-            metricValue: 10420,
+            metricValue: 0,
             metricUnit: 'tickers',
-            latency: 120,
-            lastHeartbeat: Date.now(),
+            latency: 0,
+            lastHeartbeat: 0,
         },
         feynman: {
             id: 'feynman',
             name: 'FEYNMAN',
             type: 'service',
-            status: 'optimizing',
+            status: 'offline',
             metricLabel: 'Entropy',
-            metricValue: 0.84,
-            latency: 45,
-            lastHeartbeat: Date.now(),
+            metricValue: 0,
+            latency: 0,
+            lastHeartbeat: 0,
         },
         boyd: {
             id: 'boyd',
             name: 'BOYD GATE',
             type: 'service',
-            status: 'online',
+            status: 'offline',
             metricLabel: 'Loop',
-            metricValue: 14,
+            metricValue: 0,
             metricUnit: 'Hz',
-            latency: 14,
-            lastHeartbeat: Date.now(),
+            latency: 0,
+            lastHeartbeat: 0,
         },
         chronos: {
             id: 'chronos',
             name: 'CHRONOS-T5',
             type: 'model',
-            status: 'online',
+            status: 'offline',
             metricLabel: 'Pred Delta',
-            metricValue: '+0.4%',
-            latency: 800,
-            lastHeartbeat: Date.now(),
+            metricValue: '---',
+            latency: 0,
+            lastHeartbeat: 0,
         },
         gemma: {
             id: 'gemma',
             name: 'GEMMA-9B',
             type: 'model',
-            status: 'offline', // Default offline
+            status: 'offline',
             metricLabel: 'Tokens/s',
             metricValue: 0,
             latency: 0,
-            lastHeartbeat: Date.now(),
+            lastHeartbeat: 0,
         },
     },
 
@@ -215,12 +270,31 @@ export const useSystemStore = create<SystemStore>((set) => ({
     // Finance (Directive-72: Live Data Integrity)
     finance: {
         unrealizedPnl: 0,
+        realizedPnl: 0,
         equity: 0,
         balance: 0,
+        btcPosition: 0,
+        equityHistory: Array(50).fill(0), // Init with zeros
+        positions: [],
+        orders: [],
     },
-    updateFinance: (updates) => set((state) => ({
-        finance: { ...state.finance, ...updates }
-    })),
+    // D-106 Initial State
+    replay: {
+        isReplaying: false,
+        replayTime: 0,
+        replaySpeed: 1.0,
+        startTime: 0,
+        endTime: 0,
+    },
+    updateFinance: (updates) => set((state) => {
+        const newHistory = updates.equity
+            ? [...state.finance.equityHistory.slice(1), updates.equity]
+            : state.finance.equityHistory;
+
+        return {
+            finance: { ...state.finance, ...updates, equityHistory: newHistory }
+        };
+    }),
 
     // Forensic Implementation
     scrubMode: false,
@@ -243,4 +317,25 @@ export const useSystemStore = create<SystemStore>((set) => ({
     // D-90: Governor Sanity
     systemSanityScore: 1.0,
     setSystemSanityScore: (score) => set({ systemSanityScore: score }),
+
+    // D-103: Live Reasoning Stream
+    reasoningTrace: [],
+    addReasoningEvent: (event) => set((state) => ({
+        reasoningTrace: [event, ...state.reasoningTrace].slice(0, 50) // Keep last 50
+    })),
+    // D-106 Replay Actions
+    setReplay: (updates) => set((state) => ({
+        replay: { ...state.replay, ...updates }
+    })),
+
+    // D-107: Legislation
+    legislation: {
+        bias: 'NEUTRAL',
+        aggression: 1.0,
+        makerOnly: false,
+        hibernation: false,
+    },
+    updateLegislation: (updates) => set((state) => ({
+        legislation: { ...state.legislation, ...updates }
+    })),
 }));

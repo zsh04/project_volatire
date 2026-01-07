@@ -181,10 +181,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let physics = feynman.update(tick.price, tick.timestamp, 0);
 
         // OODA Orient
-        let ooda_state = ooda.orient(physics.clone(), 0, brain_client.as_mut()).await;
+        let ooda_state = ooda.orient(physics.clone(), 0, brain_client.as_mut(), "NEUTRAL".to_string()).await;
 
         // OODA Decide
-        let decision = ooda.decide(&ooda_state);
+        let default_legislation = reflex::governor::legislator::LegislativeState::default();
+        let decision = ooda.decide(&ooda_state, &default_legislation);
 
         // Shadow Execution Bypass
         // Action is an enum, use matches! or pattern matching

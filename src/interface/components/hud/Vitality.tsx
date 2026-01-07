@@ -77,7 +77,7 @@ const Vitality: React.FC = () => {
         <div className="flex flex-col border border-white/10 bg-black/40 backdrop-blur-md rounded-md overflow-hidden p-3 w-[300px]">
             {/* Header */}
             <div className="flex justify-between items-center mb-2">
-                <h3 className="text-xs font-mono text-gray-400 uppercase tracking-widest">Vitality Sentinel</h3>
+                <h3 className="text-xs font-mono text-gray-400 uppercase tracking-widest">Health & Latency Monitor</h3>
                 <div className={`px-2 py-0.5 text-[10px] font-bold rounded-sm ${vitality.status === 'OPTIMAL' ? 'bg-green-900/50 text-green-400 border border-green-700/50' :
                     vitality.status === 'DEGRADED' ? 'bg-yellow-900/50 text-yellow-400 border border-yellow-700/50' :
                         'bg-red-900/50 text-red-500 border border-red-700/50 animate-pulse'

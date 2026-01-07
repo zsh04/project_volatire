@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useMarketStore } from '../stores/market-store';
+import { useAgentStore } from '../stores/agent-store';
 import { useSystemStore } from '../stores/system-store';
 
 export function LiveTelemetryProvider({ children }: { children: React.ReactNode }) {
@@ -40,9 +41,38 @@ export function LiveTelemetryProvider({ children }: { children: React.ReactNode 
 
                         useSystemStore.getState().updateFinance({
                             unrealizedPnl: Number(p.unrealizedPnl) || 0,
+                            realizedPnl: Number(p.realizedPnl) || 0,
                             equity: Number(p.equity) || 0,
-                            balance: Number(p.balance) || 0
+                            balance: Number(p.balance) || 0,
+                            btcPosition: Number(p.btcPosition) || 0
                         });
+
+                        // D-103: Live Reasoning Stream
+                        if (p.reasoningTrace && Array.isArray(p.reasoningTrace)) {
+                            p.reasoningTrace.forEach((event: any) => {
+                                useSystemStore.getState().addReasoningEvent(event);
+
+                                // D-104: Bridge to Agent Store for ConsensusMeter
+                                if (event.author === 'SOROS' || event.author === 'SIMONS') {
+                                    useAgentStore.getState().updatePersona('Simons', {
+                                        status: 'active',
+                                        lastReason: event.content,
+                                        confidence: event.confidence || 0.5
+                                    });
+                                } else if (event.author === 'TALEB' || event.author === 'HYPATIA') {
+                                    useAgentStore.getState().updatePersona('Hypatia', {
+                                        status: 'active',
+                                        lastReason: event.content,
+                                        confidence: event.confidence || 0.5
+                                    });
+                                }
+                            });
+                        }
+
+                        // D-83: Ignition Status
+                        if (p.ignitionStatus) {
+                            useSystemStore.getState().setIgnitionStatus(p.ignitionStatus as any);
+                        }
 
                         const gemmaStatus = (p.gemmaLatencyMs || 0) > 0 ? 'online' : 'offline';
                         useSystemStore.getState().updateNode('gemma', {
@@ -111,36 +141,38 @@ export function LiveTelemetryProvider({ children }: { children: React.ReactNode 
         }
     }, [currentRegime]);
 
-    // 4. Forensic Scrub Hook (Directive-78)
-    const { scrubMode, scrubTimestamp } = useSystemStore(state => ({
-        scrubMode: state.scrubMode,
-        scrubTimestamp: state.scrubTimestamp
-    }));
+    // 4. Forensic Scrub Hook (Directive-106)
+    const { isReplaying, replayTime, startTime, endTime } = useSystemStore(state => state.replay);
 
     useEffect(() => {
         if (!workerRef.current) return;
 
-        if (scrubMode) {
+        if (isReplaying) {
+            // Trigger Replay Mode
             workerRef.current.postMessage({
-                type: 'SET_MODE',
-                payload: { mode: 'SCRUB' }
+                type: 'START_REPLAY',
+                payload: {
+                    symbol: 'BTC-USDT', // Default active symbol
+                    startTime: startTime || Date.now() - 60000, // Default to last minute if undefined
+                    endTime: endTime || Date.now()
+                }
             });
         } else {
+            // Return to Live
             workerRef.current.postMessage({
-                type: 'SET_MODE',
-                payload: { mode: 'LIVE' }
+                type: 'STOP_REPLAY'
             });
         }
-    }, [scrubMode]);
+    }, [isReplaying, startTime, endTime]);
 
     useEffect(() => {
-        if (scrubMode && scrubTimestamp && workerRef.current) {
+        if (isReplaying && replayTime && workerRef.current) {
             workerRef.current.postMessage({
                 type: 'SCRUB_SEEK',
-                payload: { timestamp: scrubTimestamp }
+                payload: { timestamp: replayTime }
             });
         }
-    }, [scrubTimestamp, scrubMode]);
+    }, [replayTime, isReplaying]);
 
     return <>{children}</>;
 }

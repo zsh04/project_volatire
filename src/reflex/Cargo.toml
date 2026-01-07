@@ -81,6 +81,8 @@ parquet = { version = "53.0", features = ["async"] }
 arrow = "53.0"
 object_store = { version = "0.11", features = ["aws"] }
 futures = "0.3" # Added for stream manipulation
+urlencoding = "2.1.3"
+error-chain = "0.12.4"
 
 [build-dependencies]
 tonic-build = "0.10"

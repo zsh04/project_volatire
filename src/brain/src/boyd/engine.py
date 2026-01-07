@@ -21,6 +21,7 @@ class BoydStrategist:
         valuation: Optional[Dict[str, Any]],  # Simons Valuation
         regime: Optional[Dict[str, Any]],  # Hypatia Regime
         forecast: Optional[pd.DataFrame],  # Kepler Forecast (P10-P90)
+        legislative_bias: str = "NEUTRAL",  # D-107
     ) -> TradeDecision:
         """
         Executes the OODA Loop Strategy Logic.
@@ -45,7 +46,15 @@ class BoydStrategist:
                     decision.action = "HOLD"
                     decision.confidence = 1.0
                     decision.reason = f"Hypatia Veto: Active Regime is {current_regime}"
+                    decision.reason = f"Hypatia Veto: Active Regime is {current_regime}"
                     return decision
+
+            # --- 1.5 LEGISLATIVE BIAS (D-107) ---
+            # The Pilot's Tactical Override
+            if legislative_bias != "NEUTRAL":
+                # We check this later on the generated signal, OR we filter inputs here.
+                # It is safer to filter the OUTPUT signal, but we can also set context.
+                pass
 
             # Ensure we have minimum viable inputs for active trading
             if not valuation or forecast is None or forecast.empty:
@@ -109,6 +118,20 @@ class BoydStrategist:
                 decision.action = "HOLD"
                 decision.confidence = 0.5
                 decision.reason = "No Confluence: Validation & Forecast Disagree"
+
+            # --- D-107: APPLY LEGISLATIVE BIAS ---
+            if legislative_bias == "LONG_ONLY" and decision.action == "SHORT":
+                logger.warning(
+                    "🚫 LEGISLATIVE VETO: Short Signal Rejected (Long Only Mode)"
+                )
+                decision.action = "HOLD"
+                decision.reason = "Legislative Veto: Long Only Mode"
+            elif legislative_bias == "SHORT_ONLY" and decision.action == "LONG":
+                logger.warning(
+                    "🚫 LEGISLATIVE VETO: Long Signal Rejected (Short Only Mode)"
+                )
+                decision.action = "HOLD"
+                decision.reason = "Legislative Veto: Short Only Mode"
 
         except Exception as e:
             logger.error(f"Boyd Error: {e}")

@@ -16,6 +16,7 @@ pub struct OODAState {
     pub nearest_regime: Option<String>, // Memory (LanceDB)
     pub oriented_at: Instant,
     pub trace_id: String, // Traceability link
+    pub brain_latency: Option<f64>, // ms
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -52,6 +53,7 @@ impl Default for OODAState {
             nearest_regime: None,
             oriented_at: Instant::now(),
             trace_id: String::new(),
+            brain_latency: None,
         }
     }
 }
@@ -122,8 +124,9 @@ impl OODACore {
     /// Implements "Jitter" Fallback: If Semantics take too long, we proceed with Safety.
     /// Implements "Cognitive Firewall" (D-87): Validates Brain response against Hard Telemetry.
     /// Implements "Semantic Nullification" (D-88): Purges corrupted reasoning.
+    /// Implements "Semantic Nullification" (D-88): Purges corrupted reasoning.
     #[tracing::instrument(skip(self, client))]
-    pub async fn orient(&mut self, physics: PhysicsState, regime_id: u8, client: Option<&mut BrainClient>) -> OODAState {
+    pub async fn orient(&mut self, physics: PhysicsState, regime_id: u8, client: Option<&mut BrainClient>, legislative_bias: String) -> OODAState {
         let _start = Instant::now();
         // D-92: Shadow Gate Reality Check
         // Check for fills on pending virtual orders against current physics price
@@ -135,7 +138,7 @@ impl OODACore {
         let trace_id = cx.span().span_context().trace_id().to_string();
 
         // 1. Asynchronous Fetch Logic
-        let (sentiment, regime) = if let Some(c) = client {
+        let (sentiment, regime, latency) = if let Some(c) = client {
             // LIVE PATH (D-54)
             // D-87: COGNITIVE FIREWALL - Construct Truth Envelope
             let mut truth = TruthEnvelope {
@@ -166,7 +169,7 @@ impl OODACore {
                 _ => "Unknown",
             };
             self.ensemble_manager.update_regime(current_regime_name);
-            let active_adapter = self.ensemble_manager.get_active_adapter();
+            let _active_adapter = self.ensemble_manager.get_active_adapter();
 
             // TODO: Pass `active_adapter` to client.get_context()
             // For now, we just log it in the trace context or debug 
@@ -175,14 +178,14 @@ impl OODACore {
             // Enforce Jitter Budget (e.g., 20ms) via Timeout
             match tokio::time::timeout(
                 self.jitter_threshold,
-                c.get_context(&truth) // Pass Truth Envelope
+                c.get_context(&truth, &legislative_bias) // D-107: Pass Bias
             ).await {
                 Ok(Ok(ctx)) => {
                     // D-91: TEMPORAL SYNC-GATE
                     // 1. Latency Check (Atomic Clock)
                     if let Err(e) = self.sync_gate.measure_latency(_start) {
                         tracing::warn!("BTC-91 SyncGate Violation (Latency): {:?}", e);
-                        (None, None)
+                        (None, None, None)
                     } else {
                         // Map Proto ContextResponse to LlmInferenceResponse for validation
                         // We treat context info as "inference" for validation purposes
@@ -197,7 +200,8 @@ impl OODACore {
                     match self.firewall.validate(&llm_resp, &truth) {
                         Ok(_) => {
                             self.nullifier.reset_continuity(); // D-88: Success resets counter
-                            (Some(ctx.sentiment_score), Some(ctx.nearest_regime))
+                            let lat = ctx.computation_time_ns as f64 / 1_000_000.0;
+                            (Some(ctx.sentiment_score), Some(ctx.nearest_regime), Some(lat))
                         },
                         Err(e) => {
                             // D-88: NULLIFICATION "THE ERASER"
@@ -208,18 +212,18 @@ impl OODACore {
                             }
                             
                             // Return BLIND STATE (Nullified)
-                            (None, None) 
+                            (None, None, None) 
                         }
                     }
                 } // End SyncGate Else
                 },
                 Ok(Err(e)) => {
                     tracing::warn!("Brain Error: {}", e);
-                    (None, None) // Error -> Blind
+                    (None, None, None) // Error -> Blind
                 },
                 Err(_) => {
                     tracing::warn!("Brain Timeout (Jitter Violated)");
-                    (None, None) // Timeout -> Blind
+                    (None, None, None) // Timeout -> Blind
                 }
             }
         } else {
@@ -249,25 +253,27 @@ impl OODACore {
             nearest_regime: regime,
             oriented_at: Instant::now(),
             trace_id,
+            brain_latency: latency,
         }
     }
 
     /// Mocks the external fetch to LanceDB / DistilBERT
-    fn fetch_semantics_simulated(&self) -> (Option<f64>, Option<String>) {
+    fn fetch_semantics_simulated(&self) -> (Option<f64>, Option<String>, Option<f64>) {
         // Simulate variability. 
         // Most of the time it's fast (cache), sometimes it lags.
         // For deterministic logic testing (not verify), we return instant mock.
         // For stress testing, we'd inject sleep.
         // Hardcoding a "Fast Path" scenario for default logic flow.
-        (Some(-0.8), Some("Liquidity Crisis 2020".to_string()))
+        (Some(-0.8), Some("Liquidity Crisis 2020".to_string()), Some(12.5))
     }
 
     /// ORIENT -> DECIDE
     /// Weighted Voting: Simons (Physics), Kepler (MeanRev), Hypatia (Sentiment)
     /// Now includes Directive-43: Provisional Risk Sizing
+    /// Now includes Directive-43: Provisional Risk Sizing
     /// Now includes Directive-45: Nuclear Veto (Double-Key)
     #[tracing::instrument(skip(self))]
-    pub fn decide(&mut self, state: &OODAState) -> Decision {
+    pub fn decide(&mut self, state: &OODAState, legislation: &crate::governor::legislator::LegislativeState) -> Decision {
         let physics = &state.physics;
         
         // 1. Update Sentinel Components
@@ -294,23 +300,9 @@ impl OODACore {
         }
 
         // 3. Update Provisional Executive
-        // Assume default entropy/efficiency for now or pass them in OODAState (Ideally OODAState should have full physics context)
-        // PhysicsState struct in `ooda_loop.rs` is missing entropy/efficiency.
-        // I should probably add them to `PhysicsState` definition in this file or use the one from `feynman.rs`.
-        // To be safe and quick, I will use placeholders or update PhysicsState.
-        // Updating PhysicsState is better.
-        // But for this specific task scope, I will pass mock values if they are missing, OR assume they are in PhysicsState.
-        // Looking at line 6-13 in ooda_loop.rs, PhysicsState has velocity, acceleration, jerk, basis. Missing entropy/efficiency.
-        // For D-43, I need them. 
-        // I will assume for now I pass 0.0 or update `PhysicsState`.
-        // Let's pass dummy values for now to preserve API or quickly add them.
-        // Adding them is better. I will add them to PhysicsState struct in a separate tool call if needed.
-        // Actually, to implement `decide` fully, I'll update the logic here.
-        
-        // MOCKING values for D-43 Logic since they aren't in the struct yet.
-        // In full integration they come from `feynman` struct.
-        let entropy = 0.5; 
-        let efficiency = 0.9;
+        // Use real physics metrics for risk sizing
+        let entropy = physics.entropy;
+        let efficiency = physics.efficiency_index;
         
         let _promoted = self.provisional.update(physics, entropy, efficiency);
         let max_risk = self.provisional.get_current_max_risk();
@@ -341,7 +333,7 @@ impl OODACore {
         }
         
         // 6. Final Decision Construction w/ Provisional Sizing
-        let decision = if base_signal >= 0.5 {
+        let mut decision = if base_signal >= 0.5 {
             Decision {
                 action: Action::Buy(max_risk * base_signal.abs()), // Apply Provisional Limit
                 reason: format!("Physics & Sentiment Aligned. Risk Tier: {}", self.provisional.current_tier_index),
@@ -360,6 +352,34 @@ impl OODACore {
                 confidence: 0.5,
             }
         };
+
+        // D-107: LEGISLATIVE VETO (Rust Layer)
+        use crate::governor::legislator::StrategicBias;
+        match legislation.bias {
+            StrategicBias::LongOnly => {
+                 if let Action::Sell(_) = decision.action {
+                     // Override to Hold
+                     tracing::warn!("🚫 RUST VETO: Sell Blocked by LongOnly Legislation");
+                     decision = Decision {
+                         action: Action::Hold,
+                         reason: "Legislative Veto: Long Only".to_string(),
+                         confidence: 1.0,
+                     };
+                 }
+            },
+            StrategicBias::ShortOnly => {
+                 if let Action::Buy(_) = decision.action {
+                     tracing::warn!("🚫 RUST VETO: Buy Blocked by ShortOnly Legislation");
+                     decision = Decision {
+                         action: Action::Hold,
+                         reason: "Legislative Veto: Short Only".to_string(),
+                         confidence: 1.0,
+                     };
+                 }
+            },
+            StrategicBias::Neutral => {}
+        }
+
 
         self.log_forensics(state, &decision, max_risk);
         decision

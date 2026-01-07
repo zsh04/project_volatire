@@ -20,8 +20,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_secret = std::env::var("KRAKEN_PRIVATE_KEY")?;
     
     info!("🧪 Verifying Keys via Balance Check...");
-    match reflex::ingest::kraken::fetch_account_balance(&api_key, &api_secret).await {
-        Ok((usd, btc)) => info!("✅ Balance Check Passed: USD={}, BTC={}", usd, btc),
+    match reflex::ingest::kraken::fetch_account_data(&api_key, &api_secret).await {
+        Ok((usd, btc, equity, pnl, pos, ord)) => {
+            info!("✅ Balance Check Passed:");
+            info!("   USD: ${}", usd);
+            info!("   BTC: {}", btc);
+            info!("   Equity: ${}", equity);
+            info!("   PnL: ${}", pnl);
+            info!("   Positions: {}", pos.len());
+            info!("   Orders: {}", ord.len());
+        },
         Err(e) => {
             info!("❌ Balance Check Failed. Keys are invalid or missing permissions.");
             info!("Error: {:?}", e);

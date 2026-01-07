@@ -30,7 +30,7 @@ impl Biopsy {
             // Using a simple format:
             // {"timestamp": "...", "error": "...", "reasoning": "..."}
             
-            let ts = packet.timestamp; // Instant is hard to serialize to absolute time without anchor.
+            let _ts = packet.timestamp; // Instant is hard to serialize to absolute time without anchor.
             // In main/nullifier, we might want SystemTime. 
             // For now, let's assume NullifiedPacket has been updated to use SystemTime or we ignore exact wall clock in this MVP 
             // and just use current write time.

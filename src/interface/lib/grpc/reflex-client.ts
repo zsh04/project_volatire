@@ -1,5 +1,5 @@
 import { ReflexServiceClient } from './generated/ReflexServiceClientPb';
-import { Empty, PhysicsResponse, OODAResponse, VetoRequest } from './generated/reflex_pb';
+import { Empty, PhysicsResponse, OODAResponse, VetoRequest, LegislativeUpdate } from './generated/reflex_pb';
 import { useMarketStore } from '../stores/market-store';
 import { useAgentStore } from '../stores/agent-store';
 import { useSystemStore } from '../stores/system-store';
@@ -171,6 +171,34 @@ export async function triggerVeto(reason: string, operator: string): Promise<boo
             // Update agent store
             useAgentStore.getState().activateVeto(reason);
             resolve(true);
+        });
+    });
+}
+
+export async function updateLegislation(
+    bias: string,
+    aggression: number,
+    makerOnly: boolean,
+    hibernation: boolean,
+    snapToBreakeven: boolean
+): Promise<boolean> {
+    const client = getReflexClient();
+
+    return new Promise((resolve, reject) => {
+        const request = new LegislativeUpdate();
+        request.setBias(bias);
+        request.setAggression(aggression);
+        request.setMakerOnly(makerOnly);
+        request.setHibernation(hibernation);
+        request.setSnapToBreakeven(snapToBreakeven);
+
+        client.updateLegislation(request, {}, (err, response) => {
+            if (err) {
+                console.error('Legislation update failed:', err);
+                reject(err);
+                return;
+            }
+            resolve(true); // Ack
         });
     });
 }

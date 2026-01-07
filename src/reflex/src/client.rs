@@ -33,6 +33,7 @@ impl BrainClient {
             vol_cluster,
             entropy,
             simons_prediction,
+            legislative_bias: "NEUTRAL".to_string(), // Default for Reason calls
         });
 
         let response = self.client.reason(request).await?;
@@ -41,7 +42,8 @@ impl BrainClient {
 
     pub async fn get_context(
         &mut self,
-        truth: &TruthEnvelope
+        truth: &TruthEnvelope,
+        legislative_bias: &str, // D-107
     ) -> Result<brain::ContextResponse, tonic::Status> {
         let envelope_json = serde_json::to_string(truth).unwrap_or_default();
         
@@ -52,7 +54,8 @@ impl BrainClient {
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
                 .as_millis() as i64,
-            truth_envelope: envelope_json, // D-87
+            truth_envelope: envelope_json, 
+            legislative_bias: legislative_bias.to_string(), // D-107
         });
 
         let response = self.client.get_context(request).await?;

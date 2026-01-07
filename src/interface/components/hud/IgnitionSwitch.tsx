@@ -16,6 +16,9 @@ const IgnitionSwitch: React.FC = () => {
                 method: 'POST',
             });
             if (!response.ok) throw new Error('Ignition request failed');
+
+            // Optimistic Update
+            useSystemStore.getState().setIgnitionStatus('WARMINGUP');
         } catch (err) {
             console.error('Failed to initiate ignition:', err);
         } finally {

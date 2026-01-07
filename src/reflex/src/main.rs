@@ -16,10 +16,10 @@ use reflex::governor::handoff::{HandoffManager, HandoffState}; // D-81
 
 // Proto imports via lib
 use reflex::reflex_proto::{
-    PhysicsResponse, OodaResponse, ReasoningStep, // D-81
-    reflex_service_server::{ReflexService, ReflexServiceServer}
+    ReasoningStep, // D-81
+    PositionState, OrderState, // D-105
 };
-use tonic::{transport::Server, Status};
+use tonic::Request;
 
 use rand::Rng; // D-81
 
@@ -105,7 +105,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     // Initialize Pool
     let state_store_res = db::state::RedisStateStore::new(redis_url).await;
-    let state_store = match state_store_res {
+    let _state_store = match state_store_res {
         Ok(s) => {
              match s.ping().await {
                  Ok(_) => {
@@ -303,7 +303,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut simons = simons::EchoStateNetwork::new(100);
     let _execution = execution::actor::ExecutionAdapter::new();
     // Directive-64: Safety Staircase (Real Instance)
-    let mut staircase_governor = reflex::governor::staircase::Staircase::new();
+    let staircase_governor = reflex::governor::staircase::Staircase::new();
     // Directive-79: Sequencer (Master Clock)
     let sequencer = reflex::sequencer::Sequencer::new();
     // Directive-80: Vitality Sentinel
@@ -318,7 +318,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut client_clone = brain_client_opt; 
 
     println!("🔄 Simulation Loop Started.");
-    let mut last_processed_yield = Instant::now();
+    let mut _last_processed_yield = Instant::now();
     let tick_rate = Duration::from_micros(100); 
     let mut now_ms = 0.0;
 
@@ -353,12 +353,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
 
             loop {
-                let result = ingest::kraken::fetch_account_balance(&key, &secret)
+                let result = ingest::kraken::fetch_account_data(&key, &secret)
                     .await
                     .map_err(|e| e.to_string());
                 match result {
-                    Ok((usd, btc)) => {
-                        let _ = balance_tx.send((usd, btc)).await;
+                    Ok(data) => {
+                        let _ = balance_tx.send(data).await;
                     },
                     Err(e) => {
                         error!("❌ Account Sync Failed: {}", e);
@@ -370,7 +370,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // --- Directive-66: Audit Loop (Real Instance) ---
-    let mut audit_loop = reflex::governor::audit_loop::AuditLoop::new();
+    let audit_loop = reflex::governor::audit_loop::AuditLoop::new();
 
     // D-83: Ignition Sequence (Capital Gate)
     let mut ignition = reflex::governor::ignition::IgnitionSequence::new();
@@ -381,6 +381,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // D-90: Rebalancer (The Governor)
     let mut rebalancer = reflex::governor::rebalancer::Rebalancer::new(50000.0); // Match Ledger
+
+    let mut last_equity = 0.0;
+    let mut last_pnl = 0.0;
+    let mut last_positions: Vec<PositionState> = Vec::new();
+    let mut last_orders: Vec<OrderState> = Vec::new();
 
     loop {
         let loop_start = Instant::now();
@@ -474,9 +479,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         now_ms += 100.0;
         
         // --- Directive-72: Consume Account Updates ---
-        if let Ok((usd, btc)) = balance_rx.try_recv() {
+        if let Ok((usd, btc, equity, pnl, positions, orders)) = balance_rx.try_recv() {
              _ledger.sync(usd, btc, 0.0);
-             info!("🏦 Ledger Synced: USD=${:.2} BTC={:.8}", usd, btc);
+             last_equity = equity;
+             last_pnl = pnl;
+             last_positions = positions;
+             last_orders = orders;
+             info!("🏦 Ledger Synced: USD=${:.2} BTC={:.8} Equity=${:.2}", usd, btc, equity);
         }
 
         let span = tracing::info_span!("ooda_tick", tick_ms = now_ms);
@@ -552,42 +561,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let market_active = true; // Assumed true if we are in this loop iteration (otherwise we break/timeout)
         ignition.update(&sentinel, market_active);
 
+        // D-107: Fetch Legislative State (Reader)
+        let legislation = if let Ok(r) = shared_state.read() {
+            r.legislation.clone()
+        } else {
+            reflex::governor::legislator::LegislativeState::default()
+        };
+        
+        let legislative_bias_str = format!("{:?}", legislation.bias).to_uppercase();
+
         // --- D-50: OODA Execution ---
         // Gated by Ignition State
         let mut ooda_state = if ignition.state == reflex::governor::ignition::IgnitionState::Ignited {
-             ooda.orient(state.clone(), regime_id, client_clone.as_mut()).await
+             ooda.orient(state.clone(), regime_id, client_clone.as_mut(), legislative_bias_str).await
         } else {
-             // If not ignited, we provide a passive/observation state
-             // Or we just don't call orient/decide at all?
-             // Orient is needed for internal state tracking? Maybe.
-             // For now, let's run Orient but BLOCK Decide or override decision.
-             
-             // Actually, Orient calls Brain (expensive). We should skip it if not ignited,
-             // UNLESS we are in PennyTrade state.
-             
              if ignition.state == reflex::governor::ignition::IgnitionState::PennyTrade {
-                 // Force Penny Trade Logic here?
-                 // Or allow OODA but force size to 0.01?
-                 ooda.orient(state.clone(), regime_id, client_clone.as_mut()).await
+                 ooda.orient(state.clone(), regime_id, client_clone.as_mut(), legislative_bias_str).await
              } else {
                  reflex::governor::ooda_loop::OODAState::default() 
              }
         };
         
         // D-86: Sentiment Override
-        // If Pilot set a manual sentiment weight, we override Hypatia's score here.
         if let Some(val) = authority_bridge.sentiment_override() {
-             // We modify the input state to the Decision Engine
-             // Note: OODAState likely has a sentiment_score field.
-             // We need to ensure ooda_state is mutable or we clone it.
-             // It's let mut above? "let ooda_state =" (implied from match).
-             // We need to make it mutable.
              ooda_state.sentiment_score = Some(val);
              tracing::info!("🎚️ SENTIMENT OVERRIDE APPLIED: {:.2}", val);
         }
 
         let decision = if ignition.state == reflex::governor::ignition::IgnitionState::Ignited {
-             ooda.decide(&ooda_state)
+             ooda.decide(&ooda_state, &legislation)
         } else {
              reflex::governor::ooda_loop::Decision::default_hold() // Force Hold
         };
@@ -601,15 +603,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             w.ooda = Some(ooda_state.clone());
             
             // Directive-72: Update Account Link
-            let current_equity = _ledger.total_equity(market.price);
-            w.account.equity = current_equity;
-            w.account.balance = _ledger.available_balance();
-            w.account.unrealized_pnl = current_equity - _ledger.start_of_day_balance;
+            // Directive-72: Update Account Link
+            if !is_sim_mode_flag && last_equity > 0.0 {
+                w.account.equity = last_equity;
+                w.account.balance = _ledger.available_balance(); // Keep sync'd balance
+                w.account.btc_position = _ledger.btc_position;
+                w.account.realized_pnl = last_pnl;
+                w.account.unrealized_pnl = last_equity - _ledger.start_of_day_balance; // approx
+                
+                // D-105: Fiscal Deck
+                w.account.active_positions = last_positions.clone();
+                w.account.open_orders = last_orders.clone();
+            } else {
+                let current_equity = _ledger.total_equity(market.price);
+                w.account.equity = current_equity;
+                w.account.balance = _ledger.available_balance();
+                w.account.btc_position = _ledger.btc_position;
+                w.account.unrealized_pnl = current_equity - _ledger.start_of_day_balance;
+                w.account.realized_pnl = 0.0;
+            }
             
-            // Directive-72: Brain Telemetry (Updated below if connected)
-            // Default/Fallback values
-            // w.gemma.tokens_per_sec = 0.0; // Set via Brain response if available
-            // w.gemma.latency_ms = 0.0;     
+            // Directive-72: Brain Telemetry
+            if let Some(lat) = ooda_state.brain_latency {
+                w.gemma.latency_ms = lat;
+                // Estimate tokens/sec (assuming ~50 tokens output per ctx call)
+                if lat > 0.0 {
+                     w.gemma.tokens_per_sec = 50.0 / (lat / 1000.0);
+                }
+            } else {
+                w.gemma.latency_ms = 0.0;
+                w.gemma.tokens_per_sec = 0.0;
+            }     
             
             // Directive-64: Update Governance Link
             w.governance.staircase_tier = staircase_governor.tier();
@@ -725,7 +749,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _ = tx_broadcast.send(broadcast_payload);
         
         // Simons Prediction (Echo State Network)
-        let simons_pred = simons.forward(state.velocity);
+        let _simons_pred = simons.forward(state.velocity);
         let next_target = state.velocity * 0.99; // Damping target
         simons.train(next_target);
         

@@ -15,4 +15,5 @@ pub mod handoff; // D-81
 pub mod ignition; // D-83
 pub mod lockdown; // D-85
 pub mod authority; // D-86
+pub mod legislator;
 pub mod rebalancer;

@@ -19,7 +19,28 @@ export async function POST(request: Request): Promise<NextResponse<SovereignComm
             );
         }
 
-        // Critical commands require biometric signature
+        // Directive-103: Sovereign Access Control
+        // 1. Check for Environment Bypass
+        const bypass = process.env.NEXT_PUBLIC_SOVEREIGN_BYPASS === 'true';
+
+        // 2. Check for Sovereign Master Key Header
+        const sovereignKey = request.headers.get('x-sovereign-key');
+
+        if (!bypass) {
+            // Secure Comparison against stored Master Key
+            const validKey = process.env.NEXT_PUBLIC_SOVEREIGN_MASTER_KEY;
+
+            // If bypass is OFF, we MUST have a valid Sovereign Key
+            if (!sovereignKey || sovereignKey !== validKey) {
+                return NextResponse.json(
+                    { success: false, error: 'Invalid or missing Sovereign Key' },
+                    { status: 401 }
+                );
+            }
+        }
+
+        // Compliance: Critical commands usually require biometric signature
+        // If bypass is active, client sends a dummy signature
         const criticalCommands = ['KILL', 'CLOSE_ALL'];
         if (criticalCommands.includes(req.command) && !req.signature) {
             return NextResponse.json(
@@ -28,14 +49,17 @@ export async function POST(request: Request): Promise<NextResponse<SovereignComm
             );
         }
 
-        // TODO: Verify WebAuthn signature
+        // Verify WebAuthn signature if present
         if (req.signature) {
-            const valid = await verifyWebAuthnSignature(req.signature, req.command);
-            if (!valid) {
-                return NextResponse.json(
-                    { success: false, error: 'Invalid biometric signature' },
-                    { status: 403 }
-                );
+            // If bypass is active, we skip strict crypto verification of the dummy signature
+            if (!bypass) {
+                const valid = await verifyWebAuthnSignature(req.signature, req.command);
+                if (!valid) {
+                    return NextResponse.json(
+                        { success: false, error: 'Invalid biometric signature' },
+                        { status: 403 }
+                    );
+                }
             }
         }
 
@@ -107,20 +131,4 @@ async function logSovereignCommand(req: SovereignCommandRequest): Promise<void> 
     // Log structured JSON for log scraper to pick up and insert into QuestDB
     // This is a robust fallback if direct DB connection is flaky
     console.log(`QUESTDB_INSERT:sovereign_commands:${JSON.stringify(logEntry)}`);
-
-    // In a full production environment with QuestDB client:
-    /*
-    const sender = new Sender();
-    await sender.connect({ port: 9009 });
-    await sender.table('sovereign_commands')
-      .symbol('command', req.command)
-      .symbol('user_id', 'pilot')
-      .symbol('source', 'WEB')
-      .string('signature', req.signature || '')
-      .float('payload', req.payload || 0.0)
-      .long('latency_us', logEntry.latency_us)
-      .at(Date.now(), 'ms');
-    await sender.flush();
-    await sender.close();
-    */
 }

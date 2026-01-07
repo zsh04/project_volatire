@@ -1,5 +1,5 @@
 
-import { Empty } from '../lib/grpc/generated/reflex_pb';
+import { Empty, TickHistoryRequest } from '../lib/grpc/generated/reflex_pb';
 import { ReflexServiceClient } from '../lib/grpc/generated/ReflexServiceClientPb';
 
 // Types (Mirroring the proto response structure for transfer)
@@ -13,8 +13,28 @@ export interface PhysicsData {
     timestamp: number;
     // Finance
     unrealizedPnl: number;
+    realizedPnl: number;
     equity: number;
     balance: number;
+    btcPosition: number;
+    // D-105
+    positions: Array<{
+        symbol: string;
+        netSize: number;
+        avgEntryPrice: number;
+        unrealizedPnl: number;
+        entryTimestamp: number;
+        currentPrice: number;
+    }>;
+    orders: Array<{
+        orderId: string;
+        symbol: string;
+        side: string;
+        quantity: number;
+        limitPrice: number;
+        status: string;
+        timestamp: number;
+    }>;
     // Model
     gemmaTokensPerSec: number;
     gemmaLatencyMs: number;
@@ -22,15 +42,84 @@ export interface PhysicsData {
     staircaseTier: number;
     staircaseProgress: number;
     auditDrift: number;
+    ignitionStatus: string;
 
     // Directive-79: Global Sequence ID
     sequenceId: number;
+
+    // Directive-103: Reasoning Stream
+    reasoningTrace: Array<{
+        id: string;
+        author: string;
+        content: string;
+        timestamp: number;
+        status: string;
+        confidence: number;
+    }>;
 }
 
 interface WorkerMessage {
     type: 'MARKET_TICK' | 'ERROR';
     payload?: PhysicsData;
     error?: string;
+}
+
+// Helper: Parse Physics Response
+function parsePhysicsResponse(res: any): PhysicsData {
+    return {
+        price: res.getPrice(),
+        velocity: res.getVelocity(),
+        acceleration: res.getAcceleration(),
+        jerk: res.getJerk(),
+        entropy: res.getEntropy(),
+        efficiencyIndex: res.getEfficiencyIndex(),
+        timestamp: res.getTimestamp(),
+        // Finance
+        unrealizedPnl: res.getUnrealizedPnl(),
+        realizedPnl: (res.getRealizedPnl && typeof res.getRealizedPnl === 'function') ? res.getRealizedPnl() : 0,
+        equity: res.getEquity(),
+        balance: res.getBalance(),
+        btcPosition: (res.getBtcPosition && typeof res.getBtcPosition === 'function') ? res.getBtcPosition() : 0,
+
+        // Directive-105: Fiscal Deck
+        positions: (res.getPositionsList && typeof res.getPositionsList === 'function') ? res.getPositionsList().map((p: any) => ({
+            symbol: p.getSymbol(),
+            netSize: p.getNetSize(),
+            avgEntryPrice: p.getAvgEntryPrice(),
+            unrealizedPnl: p.getUnrealizedPnl(),
+            entryTimestamp: p.getEntryTimestamp(),
+            currentPrice: p.getCurrentPrice()
+        })) : [],
+        orders: (res.getOrdersList && typeof res.getOrdersList === 'function') ? res.getOrdersList().map((o: any) => ({
+            orderId: o.getOrderId(),
+            symbol: o.getSymbol(),
+            side: o.getSide(),
+            quantity: o.getQuantity(),
+            limitPrice: o.getLimitPrice(),
+            status: o.getStatus(),
+            timestamp: o.getTimestamp()
+        })) : [],
+
+        // Model
+        gemmaTokensPerSec: res.getGemmaTokensPerSec(),
+        gemmaLatencyMs: res.getGemmaLatencyMs(),
+        // Governance
+        staircaseTier: res.getStaircaseTier(),
+        staircaseProgress: res.getStaircaseProgress(),
+        auditDrift: res.getAuditDrift(),
+        ignitionStatus: (res.getIgnitionStatus && typeof res.getIgnitionStatus === 'function') ? res.getIgnitionStatus() : 'HIBERNATION',
+        // D-79
+        sequenceId: res.getSequenceId(),
+        // D-103
+        reasoningTrace: res.getReasoningTraceList().map((t: any) => ({
+            id: t.getId(),
+            author: t.getAuthor(),
+            content: t.getContent(),
+            timestamp: t.getTimestamp(),
+            status: t.getStatus(),
+            confidence: t.getConfidence()
+        })),
+    };
 }
 
 // --- Priority Queue (Min-Heap) ---
@@ -106,6 +195,7 @@ const client = new ReflexServiceClient(ENVOY_URL, null, null);
 
 // Stream Control
 let stream: any = null;
+let replayStream: any = null;
 
 // Forensic Ring Buffer (D-78)
 const BUFFER_CAPACITY = 3600; // 60s @ 60Hz
@@ -154,18 +244,6 @@ function processJitterBuffer() {
         }
 
         // Case 3: Gap Detected (Future packet)
-        // Check if we waited long enough (Starvation / Packet Loss)
-        // Note: Using packet timestamp vs system time. 
-        // We assume packet.timestamp is close to 'now'.
-        // If packet is sitting in buffer for > JITTER_MS? No, we don't track insert time.
-        // We track HEAD packet age?
-        // Simple heuristic: If buffer is getting too big, or if head packet is "old" enough relative to last emit?
-        // Better: Compare packet timestamp to estimated 'now'.
-
-        // Fallback: If gap is huge (> 60Hz * 0.1s = 6 frames), just jump?
-        // Or if the head packet is older than (Date.now() - JITTER_MS), force emit.
-        // But internal timestamp (Sim time) might drift from wall clock.
-
         // Force Jump if buffer > 10 items (approx 160ms latency at 60Hz)
         if (buffer.size() > 10) {
             console.warn(`[Jitter] Gap Skipped! Jumping from ${expectedSeqId} to ${packet.sequenceId}, Buffer Size: ${buffer.size()}`);
@@ -213,6 +291,12 @@ self.onmessage = (e: MessageEvent) => {
         case 'SCRUB_SEEK':
             handleScrubSeek(e.data.payload.timestamp);
             break;
+        case 'START_REPLAY':
+            startReplay(e.data.payload.symbol, e.data.payload.startTime, e.data.payload.endTime);
+            break;
+        case 'STOP_REPLAY':
+            stopReplay();
+            break;
     }
 };
 
@@ -235,6 +319,67 @@ function handleScrubSeek(targetTs: number) {
     self.postMessage({ type: 'MARKET_TICK', payload: closestFrame });
 }
 
+function startReplay(symbol: string, startTime: number, endTime: number) {
+    console.log(`[Worker] Starting Replay for ${symbol} [${startTime} -> ${endTime}]`);
+    stopStream(); // Ensure live is off
+    if (replayStream) {
+        replayStream.cancel();
+    }
+
+    // Clear Buffers
+    ringBuffer.length = 0;
+    writeIndex = 0;
+    mode = 'SCRUB'; // Replay implies scrubbing capability
+
+    const req = new TickHistoryRequest();
+    req.setSymbol(symbol);
+    req.setStartTime(startTime);
+    req.setEndTime(endTime);
+
+    try {
+        replayStream = client.getTickHistory(req, {});
+    } catch (err) {
+        console.error('[Worker] Failed to start replay stream:', err);
+        return;
+    }
+
+    replayStream.on('data', (res: any) => {
+        const data = parsePhysicsResponse(res);
+        // In replay, we fill the Ring Buffer directly
+        if (ringBuffer.length < BUFFER_CAPACITY) {
+            ringBuffer.push(data);
+        } else {
+            // Buffer full? If historical data > 3600 points, we wrap or drop?
+            // For now, wrap.
+            ringBuffer[writeIndex] = data;
+            writeIndex = (writeIndex + 1) % BUFFER_CAPACITY;
+        }
+
+        // Auto-emit first frame?
+        // Let's emit the first frame so UI shows something
+        if (ringBuffer.length === 1) {
+            self.postMessage({ type: 'MARKET_TICK', payload: data });
+        }
+    });
+
+    replayStream.on('end', () => {
+        console.log('[Worker] Replay Download Complete. Frames:', ringBuffer.length);
+    });
+
+    replayStream.on('error', (err: any) => {
+        console.error('[Worker] Replay Stream Error:', err);
+    });
+}
+
+function stopReplay() {
+    if (replayStream) {
+        replayStream.cancel();
+        replayStream = null;
+    }
+    mode = 'LIVE';
+    startStream(); // Resume live
+}
+
 function startStream() {
     console.log('[Worker] Connecting to Live Telemetry Stream via gRPC-web...');
     console.log('[Worker] Target URL:', ENVOY_URL);
@@ -253,33 +398,7 @@ function startStream() {
     }
 
     stream.on('data', (res: any) => {
-        // Confirmation Log
-        // console.log('✅ [Worker] Stream data received!', res);
-
-        // Extract raw data
-        const data: PhysicsData = {
-            price: res.getPrice(),
-            velocity: res.getVelocity(),
-            acceleration: res.getAcceleration(),
-            jerk: res.getJerk(),
-            entropy: res.getEntropy(),
-            efficiencyIndex: res.getEfficiencyIndex(),
-            timestamp: res.getTimestamp(),
-            // Finance
-            unrealizedPnl: res.getUnrealizedPnl(),
-            equity: res.getEquity(),
-            balance: res.getBalance(),
-            // Model
-            gemmaTokensPerSec: res.getGemmaTokensPerSec(),
-            gemmaLatencyMs: res.getGemmaLatencyMs(),
-            // Governance
-            staircaseTier: res.getStaircaseTier(),
-            staircaseProgress: res.getStaircaseProgress(),
-            auditDrift: res.getAuditDrift(),
-            // D-79
-            sequenceId: res.getSequenceId(),
-        };
-
+        const data = parsePhysicsResponse(res);
         // Push to Jitter Buffer instead of emitting directly
         buffer.push(data);
     });
@@ -329,14 +448,21 @@ function startSyntheticTicks(rate: number) {
             efficiencyIndex: 0.95 + Math.random() * 0.05,
             timestamp: Date.now(),
             unrealizedPnl: 0,
+            realizedPnl: 0,
             equity: 10000,
             balance: 10000,
+            btcPosition: 0.5,
             gemmaTokensPerSec: 100 + Math.random() * 20,
             gemmaLatencyMs: 50 + Math.random() * 10,
             staircaseTier: 0,
             staircaseProgress: 0,
             auditDrift: 0,
+            ignitionStatus: 'IGNITED',
             sequenceId: syntheticSeqId++,
+            // D-105
+            positions: [],
+            orders: [],
+            reasoningTrace: [],
         };
 
         buffer.push(syntheticData);
@@ -350,38 +476,6 @@ function stopSyntheticTicks() {
         console.log('[Worker] Stopped synthetic tick injection');
     }
 }
-
-// Message Handler
-self.addEventListener('message', (event: MessageEvent) => {
-    const { type, payload } = event.data;
-
-    switch (type) {
-        case 'START_STREAM':
-            startStream();
-            break;
-        case 'STOP_STREAM':
-            stopStream();
-            break;
-        case 'START_SCRUB':
-            mode = 'SCRUB';
-            break;
-        case 'STOP_SCRUB':
-            mode = 'LIVE';
-            break;
-        case 'SEEK_SCRUB':
-            handleScrubSeek(payload.timestamp);
-            break;
-        // D-84: Stress Test Controls
-        case 'START_SYNTHETIC_TICKS':
-            startSyntheticTicks(payload.rate || 5000);
-            break;
-        case 'STOP_SYNTHETIC_TICKS':
-            stopSyntheticTicks();
-            break;
-        default:
-            console.warn('[Worker] Unknown message type:', type);
-    }
-});
 
 // Auto-start stream on worker init
 startStream();

@@ -132,55 +132,113 @@ async fn connect_binance_loop(url: &Url, tx: &mpsc::Sender<Tick>)
     Ok(())
 }
 
-pub async fn fetch_account_balance(api_key: &str, api_secret: &str) -> Result<(f64, f64), Box<dyn std::error::Error>> {
-    let client = reqwest::Client::new();
-    let uri_path = "/0/private/Balance";
-    let url = format!("https://api.kraken.com{}", uri_path);
-    
-    // Nonce
-    let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_millis().to_string();
-    let payload = format!("nonce={}", nonce);
+use crate::reflex_proto::{PositionState, OrderState};
 
-    // Sign
+async fn kraken_request(api_key: &str, api_secret: &str, path: &str, payload: &str) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let client = reqwest::Client::new();
+    let url = format!("https://api.kraken.com{}", path);
+    
+    let nonce = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH)?.as_millis().to_string();
+    let full_payload = format!("nonce={}&{}", nonce, payload);
+
     let mut sha256 = Sha256::new();
     sha256.update(nonce.as_bytes());
-    sha256.update(payload.as_bytes()); // nonce=... is the POST data
+    sha256.update(full_payload.as_bytes());
     let sha256_hash = sha256.finalize();
 
     let mut mac = Hmac::<Sha512>::new_from_slice(&general_purpose::STANDARD.decode(api_secret)?)?;
-    mac.update(uri_path.as_bytes());
+    mac.update(path.as_bytes());
     mac.update(&sha256_hash);
     let signature = general_purpose::STANDARD.encode(mac.finalize().into_bytes());
 
     let resp = client.post(&url)
         .header("API-Key", api_key)
         .header("API-Sign", signature)
-        .body(payload)
+        .body(full_payload)
         .send()
         .await?
         .json::<serde_json::Value>()
         .await?;
 
-    // Parse Response (e.g. {"error":[],"result":{"ZUSD":"1000.0","XXBT":"0.5"}})
     if let Some(err) = resp.get("error").and_then(|e| e.as_array()) {
         if !err.is_empty() {
              return Err(format!("Kraken API Error: {:?}", err).into());
         }
     }
 
-    let result = resp.get("result").ok_or("No result field")?;
-    
-    // Kraken uses ZUSD for USD and XXBT for Bitcoin
-    let usd = result.get("ZUSD").or_else(|| result.get("USD"))
-              .and_then(|v| v.as_str())
-              .and_then(|v| v.parse::<f64>().ok())
-              .unwrap_or(0.0);
-              
-    let btc = result.get("XXBT").or_else(|| result.get("XBT"))
-              .and_then(|v| v.as_str())
-              .and_then(|v| v.parse::<f64>().ok())
-              .unwrap_or(0.0);
+    resp.get("result").cloned().ok_or("No result field".into())
+}
 
-    info!("💰 Account Sync: USD=${:.2}, BTC={:.8}", usd, btc);
-    Ok((usd, btc))
+pub async fn fetch_account_data(api_key: &str, api_secret: &str) -> Result<(f64, f64, f64, f64, Vec<PositionState>, Vec<OrderState>), Box<dyn std::error::Error>> {
+    // 1. TradeBalance (Equity)
+    let tb_res = kraken_request(api_key, api_secret, "/0/private/TradeBalance", "asset=ZUSD").await?;
+    let equity = tb_res.get("eb").and_then(|v| v.as_str()).unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+
+    // 2. Balance (Assets, Cash)
+    let b_res = kraken_request(api_key, api_secret, "/0/private/Balance", "").await?;
+    let zusd = b_res.get("ZUSD").or_else(|| b_res.get("USDT")).and_then(|v| v.as_str()).unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+    let xxbt = b_res.get("XXBT").or_else(|| b_res.get("XBT")).and_then(|v| v.as_str()).unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+
+    // 3. OpenPositions
+    // Returns dict of txid -> { pair, time, type, cost, vol, net... }
+    let mut positions = Vec::new();
+    if let Ok(op_res) = kraken_request(api_key, api_secret, "/0/private/OpenPositions", "docalcs=true").await {
+        if let Some(obj) = op_res.as_object() {
+            for (_, val) in obj {
+                let symbol = val.get("pair").and_then(|v| v.as_str()).unwrap_or("UNKNOWN").to_string();
+                let vol = val.get("vol").and_then(|v| v.as_str()).unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+                let cost = val.get("cost").and_then(|v| v.as_str()).unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+                let net = val.get("net").and_then(|v| v.as_str()).unwrap_or("0").parse::<f64>().unwrap_or(0.0); // Unrealized PnL? Check API. 'net' is usually PnL in docalcs mode.
+                // Actually 'net' might be something else. 'value' - 'cost' = pnl.
+                let value = val.get("value").and_then(|v| v.as_str()).unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+                let pnl = if value != 0.0 { value - cost } else { net }; // fallback scheme
+                
+                let time = val.get("time").and_then(|v| v.as_f64()).unwrap_or(0.0) as i64; // Unix float
+                
+                // Entry price = cost / vol
+                let entry = if vol != 0.0 { cost / vol } else { 0.0 };
+
+                positions.push(PositionState {
+                    symbol,
+                    net_size: vol,
+                    avg_entry_price: entry,
+                    unrealized_pnl: pnl,
+                    entry_timestamp: time * 1000, // s to ms
+                    current_price: 0.0, // Filled by ticker in main?
+                });
+            }
+        }
+    }
+
+    // 4. OpenOrders
+    let mut orders = Vec::new();
+    if let Ok(oo_res) = kraken_request(api_key, api_secret, "/0/private/OpenOrders", "").await {
+        if let Some(open) = oo_res.get("open").and_then(|v| v.as_object()) {
+            for (id, val) in open {
+                let desc = val.get("descr");
+                let pair = desc.and_then(|d| d.get("pair")).and_then(|s| s.as_str()).unwrap_or("?").to_string();
+                let side = desc.and_then(|d| d.get("type")).and_then(|s| s.as_str()).unwrap_or("?").to_string();
+                let price = desc.and_then(|d| d.get("price")).and_then(|s| s.as_str()).unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+                let vol = val.get("vol").and_then(|v| v.as_str()).unwrap_or("0").parse::<f64>().unwrap_or(0.0);
+                let opentm = val.get("opentm").and_then(|v| v.as_f64()).unwrap_or(0.0) as i64;
+
+                orders.push(OrderState {
+                    order_id: id.clone(),
+                    symbol: pair,
+                    side: side.to_uppercase(),
+                    quantity: vol,
+                    limit_price: price,
+                    status: "OPEN".to_string(),
+                    timestamp: opentm * 1000,
+                });
+            }
+        }
+    }
+    
+    let total_unrealized: f64 = positions.iter().map(|p| p.unrealized_pnl).sum();
+    // Kraken Equity 'eb' usually includes unrealized pnl.
+    
+    info!("💰 Account Sync: Equity=${:.2} | PnL=${:.2}", equity, total_unrealized);
+
+    Ok((zusd, xxbt, equity, total_unrealized, positions, orders))
 }

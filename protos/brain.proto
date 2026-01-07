@@ -19,6 +19,9 @@ service BrainService {
 
     // Context: Reflex asks Brain for Semantic Context (Memory + Sentiment).
     rpc GetContext (ContextRequest) returns (ContextResponse);
+
+    // Memory: Reflex saves a significant event (Trade/Veto) to Episodic Memory.
+    rpc AddMemoryCheckpoint (MemoryCheckpoint) returns (Ack);
 }
 
 message ContextRequest {
@@ -27,6 +30,7 @@ message ContextRequest {
     int64 timestamp = 3;
     // D-87 Firewall: Hard Telemetry Injection
     string truth_envelope = 4; 
+    string legislative_bias = 5; // D-107
 }
 
 message ContextResponse {
@@ -71,6 +75,7 @@ message StateVector {
     double vol_cluster = 3;
     double entropy = 4;
     double simons_prediction = 5;
+    string legislative_bias = 6; // D-107: "LONG_ONLY", "SHORT_ONLY", "NEUTRAL"
 }
 
 message StrategyIntent {
@@ -101,3 +106,18 @@ message ForecastResult {
     double p90 = 3;
     double horizon = 4;
 }
+
+message MemoryCheckpoint {
+    int64 timestamp = 1;
+    string type = 2; // "EPISODIC", "PROCEDURAL"
+    string payload = 3; // JSON string of state/reasoning
+    string outcome = 4; // "PROFIT", "LOSS", "VETO"
+    string venue = 5; // "KRAKEN", "BINANCE"
+    string vector_text = 6; // Text to vectorize (Reasoning or Market Narrative)
+}
+
+message Ack {
+    bool success = 1;
+    string message = 2;
+}
+

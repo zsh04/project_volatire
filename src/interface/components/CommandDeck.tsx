@@ -64,7 +64,7 @@ export function CommandDeck() {
         await handleCommand(SovereignCommand.KILL);
       }
     } else if (offset < -150) {
-      // Swipe Left -> VETO
+      // Swipe Left -> SYSTEM RISK-HALT (VETO)
       await handleCommand(SovereignCommand.VETO);
     }
   };
@@ -96,7 +96,7 @@ export function CommandDeck() {
         <div className="h-8 w-px bg-white/10 mx-2" />
 
         <div className="flex flex-col">
-          <span className="text-[10px] text-white/40 font-mono tracking-wider uppercase">System Sanity</span>
+          <span className="text-[10px] text-white/40 font-mono tracking-wider uppercase">Health Monitor</span>
           <div className="flex items-center gap-2">
             <Activity size={14} className={systemSanityScore > 0.8 ? 'text-emerald-400' : 'text-red-500'} />
             <span className={`text-sm font-mono font-bold ${systemSanityScore > 0.8 ? 'text-emerald-400' : 'text-red-500'}`}>
@@ -109,7 +109,7 @@ export function CommandDeck() {
       {/* CENTER: Swipe-to-Kill Slider */}
       <div className="relative w-[400px] h-12 bg-black/40 rounded-full border border-white/10 overflow-hidden flex items-center justify-center" ref={widthRef}>
         <div className="absolute inset-0 flex items-center justify-between px-6 pointer-events-none opacity-40">
-          <span className="text-[10px] font-mono text-amber-500 tracking-widest">{'< VETO'}</span>
+          <span className="text-[10px] font-mono text-amber-500 tracking-widest">{'< RISK-HALT'}</span>
           <span className="text-[10px] font-mono text-red-500 tracking-widest">{'KILL >'}</span>
         </div>
 

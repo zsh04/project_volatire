@@ -2,6 +2,32 @@ import * as jspb from 'google-protobuf'
 
 
 
+export class TickHistoryRequest extends jspb.Message {
+  getSymbol(): string;
+  setSymbol(value: string): TickHistoryRequest;
+
+  getStartTime(): number;
+  setStartTime(value: number): TickHistoryRequest;
+
+  getEndTime(): number;
+  setEndTime(value: number): TickHistoryRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): TickHistoryRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: TickHistoryRequest): TickHistoryRequest.AsObject;
+  static serializeBinaryToWriter(message: TickHistoryRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): TickHistoryRequest;
+  static deserializeBinaryFromReader(message: TickHistoryRequest, reader: jspb.BinaryReader): TickHistoryRequest;
+}
+
+export namespace TickHistoryRequest {
+  export type AsObject = {
+    symbol: string,
+    startTime: number,
+    endTime: number,
+  }
+}
+
 export class PhysicsResponse extends jspb.Message {
   getPrice(): number;
   setPrice(value: number): PhysicsResponse;
@@ -35,6 +61,12 @@ export class PhysicsResponse extends jspb.Message {
 
   getBalance(): number;
   setBalance(value: number): PhysicsResponse;
+
+  getRealizedPnl(): number;
+  setRealizedPnl(value: number): PhysicsResponse;
+
+  getBtcPosition(): number;
+  setBtcPosition(value: number): PhysicsResponse;
 
   getGemmaTokensPerSec(): number;
   setGemmaTokensPerSec(value: number): PhysicsResponse;
@@ -71,6 +103,16 @@ export class PhysicsResponse extends jspb.Message {
   getSystemSanityScore(): number;
   setSystemSanityScore(value: number): PhysicsResponse;
 
+  getPositionsList(): Array<PositionState>;
+  setPositionsList(value: Array<PositionState>): PhysicsResponse;
+  clearPositionsList(): PhysicsResponse;
+  addPositions(value?: PositionState, index?: number): PositionState;
+
+  getOrdersList(): Array<OrderState>;
+  setOrdersList(value: Array<OrderState>): PhysicsResponse;
+  clearOrdersList(): PhysicsResponse;
+  addOrders(value?: OrderState, index?: number): OrderState;
+
   serializeBinary(): Uint8Array;
   toObject(includeInstance?: boolean): PhysicsResponse.AsObject;
   static toObject(includeInstance: boolean, msg: PhysicsResponse): PhysicsResponse.AsObject;
@@ -92,6 +134,8 @@ export namespace PhysicsResponse {
     unrealizedPnl: number,
     equity: number,
     balance: number,
+    realizedPnl: number,
+    btcPosition: number,
     gemmaTokensPerSec: number,
     gemmaLatencyMs: number,
     staircaseTier: number,
@@ -103,6 +147,88 @@ export namespace PhysicsResponse {
     reasoningTraceList: Array<ReasoningStep.AsObject>,
     ignitionStatus: string,
     systemSanityScore: number,
+    positionsList: Array<PositionState.AsObject>,
+    ordersList: Array<OrderState.AsObject>,
+  }
+}
+
+export class PositionState extends jspb.Message {
+  getSymbol(): string;
+  setSymbol(value: string): PositionState;
+
+  getNetSize(): number;
+  setNetSize(value: number): PositionState;
+
+  getAvgEntryPrice(): number;
+  setAvgEntryPrice(value: number): PositionState;
+
+  getUnrealizedPnl(): number;
+  setUnrealizedPnl(value: number): PositionState;
+
+  getEntryTimestamp(): number;
+  setEntryTimestamp(value: number): PositionState;
+
+  getCurrentPrice(): number;
+  setCurrentPrice(value: number): PositionState;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): PositionState.AsObject;
+  static toObject(includeInstance: boolean, msg: PositionState): PositionState.AsObject;
+  static serializeBinaryToWriter(message: PositionState, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): PositionState;
+  static deserializeBinaryFromReader(message: PositionState, reader: jspb.BinaryReader): PositionState;
+}
+
+export namespace PositionState {
+  export type AsObject = {
+    symbol: string,
+    netSize: number,
+    avgEntryPrice: number,
+    unrealizedPnl: number,
+    entryTimestamp: number,
+    currentPrice: number,
+  }
+}
+
+export class OrderState extends jspb.Message {
+  getOrderId(): string;
+  setOrderId(value: string): OrderState;
+
+  getSymbol(): string;
+  setSymbol(value: string): OrderState;
+
+  getSide(): string;
+  setSide(value: string): OrderState;
+
+  getQuantity(): number;
+  setQuantity(value: number): OrderState;
+
+  getLimitPrice(): number;
+  setLimitPrice(value: number): OrderState;
+
+  getStatus(): string;
+  setStatus(value: string): OrderState;
+
+  getTimestamp(): number;
+  setTimestamp(value: number): OrderState;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): OrderState.AsObject;
+  static toObject(includeInstance: boolean, msg: OrderState): OrderState.AsObject;
+  static serializeBinaryToWriter(message: OrderState, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): OrderState;
+  static deserializeBinaryFromReader(message: OrderState, reader: jspb.BinaryReader): OrderState;
+}
+
+export namespace OrderState {
+  export type AsObject = {
+    orderId: string,
+    symbol: string,
+    side: string,
+    quantity: number,
+    limitPrice: number,
+    status: string,
+    timestamp: number,
   }
 }
 
@@ -260,6 +386,40 @@ export namespace RatchetRequest {
     TIGHTEN = 1,
     FREEZE = 2,
     KILL = 3,
+  }
+}
+
+export class LegislativeUpdate extends jspb.Message {
+  getBias(): string;
+  setBias(value: string): LegislativeUpdate;
+
+  getAggression(): number;
+  setAggression(value: number): LegislativeUpdate;
+
+  getMakerOnly(): boolean;
+  setMakerOnly(value: boolean): LegislativeUpdate;
+
+  getHibernation(): boolean;
+  setHibernation(value: boolean): LegislativeUpdate;
+
+  getSnapToBreakeven(): boolean;
+  setSnapToBreakeven(value: boolean): LegislativeUpdate;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): LegislativeUpdate.AsObject;
+  static toObject(includeInstance: boolean, msg: LegislativeUpdate): LegislativeUpdate.AsObject;
+  static serializeBinaryToWriter(message: LegislativeUpdate, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): LegislativeUpdate;
+  static deserializeBinaryFromReader(message: LegislativeUpdate, reader: jspb.BinaryReader): LegislativeUpdate;
+}
+
+export namespace LegislativeUpdate {
+  export type AsObject = {
+    bias: string,
+    aggression: number,
+    makerOnly: boolean,
+    hibernation: boolean,
+    snapToBreakeven: boolean,
   }
 }
 

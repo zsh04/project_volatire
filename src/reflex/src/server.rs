@@ -9,10 +9,16 @@ use crate::reflex_proto::reflex_service_server::ReflexService;
 use crate::reflex_proto::{
     Ack, Empty, PhysicsResponse, OodaResponse, VetoRequest, 
     DemoteRequest, RatchetRequest, ConfigPayload, Heartbeat,
-    ReasoningStep // D-81
+    ReasoningStep, // D-81
+    PositionState, OrderState, // D-105
+    TickHistoryRequest, // D-106
+    LegislativeUpdate, // D-107
 };
+use tokio::sync::mpsc;
+use tokio_stream::wrappers::ReceiverStream;
 use crate::feynman::PhysicsState;
 use crate::governor::ooda_loop::OODAState;
+use crate::governor::legislator::{LegislativeState, StrategicBias};
 
 
 
@@ -23,6 +29,12 @@ pub struct AccountSnapshot {
     pub unrealized_pnl: f64,
     pub equity: f64,
     pub balance: f64,
+    // D-104
+    pub realized_pnl: f64,
+    pub btc_position: f64,
+    // D-105: Fiscal Control Deck
+    pub active_positions: Vec<PositionState>,
+    pub open_orders: Vec<OrderState>,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -59,6 +71,7 @@ pub struct SharedState {
     pub reasoning_trace: Vec<ReasoningStep>,
     pub ignition_status: String, // D-83
     pub ignition_request: bool, // D-83 Trigger
+    pub legislation: LegislativeState, // D-107
 }
 
 impl Default for SharedState {
@@ -74,6 +87,7 @@ impl Default for SharedState {
             reasoning_trace: Vec::new(),
             ignition_status: "HIBERNATION".to_string(), // Default
             ignition_request: false,
+            legislation: LegislativeState::default(),
         }
     }
 }
@@ -115,6 +129,9 @@ impl ReflexService for ReflexServerImpl {
             unrealized_pnl: r.account.unrealized_pnl,
             equity: r.account.equity,
             balance: r.account.balance,
+            // D-104
+            realized_pnl: r.account.realized_pnl,
+            btc_position: r.account.btc_position,
             // Model
             gemma_tokens_per_sec: r.gemma.tokens_per_sec,
             gemma_latency_ms: r.gemma.latency_ms,
@@ -138,6 +155,10 @@ impl ReflexService for ReflexServerImpl {
             
             // D-90: Global Fidelity
             system_sanity_score: r.governance.system_sanity_score,
+            
+            // D-105: Fiscal Control Deck
+            positions: r.account.active_positions.clone(),
+            orders: r.account.open_orders.clone(),
         }))
     }
 
@@ -158,6 +179,9 @@ impl ReflexService for ReflexServerImpl {
                     unrealized_pnl: r.account.unrealized_pnl,
                     equity: r.account.equity,
                     balance: r.account.balance,
+                    // D-104
+                    realized_pnl: r.account.realized_pnl,
+                    btc_position: r.account.btc_position,
                     // Model
                     gemma_tokens_per_sec: r.gemma.tokens_per_sec,
                     gemma_latency_ms: r.gemma.latency_ms,
@@ -181,6 +205,10 @@ impl ReflexService for ReflexServerImpl {
                     
                     // D-90: System Sanity Score
                     system_sanity_score: r.governance.system_sanity_score,
+
+                    // D-105: Fiscal Control Deck
+                    positions: r.account.active_positions.clone(),
+                    orders: r.account.open_orders.clone(),
                 }),
                 sentiment_score: ooda.sentiment_score,
                 nearest_regime: ooda.nearest_regime.as_ref().map(|s| s.clone()),
@@ -206,11 +234,60 @@ impl ReflexService for ReflexServerImpl {
          Ok(Response::new(Ack { success: true, message: "Use Provisional API (Upcoming)".into() }))
     }
 
+    type GetTickHistoryStream = ReceiverStream<Result<PhysicsResponse, Status>>;
+
+    async fn get_tick_history(
+        &self,
+        request: Request<TickHistoryRequest>,
+    ) -> Result<Response<Self::GetTickHistoryStream>, Status> {
+        let req = request.into_inner();
+        tracing::info!("🕰️  TIME MACHINE REQUEST: {} [{} -> {}]", req.symbol, req.start_time, req.end_time);
+
+        let (tx, rx) = mpsc::channel(100);
+        
+        // Spawn query task
+        tokio::spawn(async move {
+            let reader = crate::historian::TickReader::new();
+            if let Err(e) = reader.fetch_ticks(&req.symbol, req.start_time, req.end_time, tx.clone()).await {
+                tracing::error!("Timescale Query Failed: {}", e);
+                let _ = tx.send(Err(Status::internal(format!("Query failed: {}", e)))).await;
+            }
+        });
+
+        Ok(Response::new(ReceiverStream::new(rx)))
+    }
+
     async fn initiate_ignition(&self, _req: Request<Empty>) -> Result<Response<Ack>, Status> {
         tracing::info!("🚀 IGNITION INITIATED BY OPERATOR");
         let mut w = self.state.write().map_err(|_| Status::internal("Lock poisoned"))?;
         w.ignition_request = true;
         Ok(Response::new(Ack { success: true, message: "Ignition Sequence Initiated".into() }))
+    }
+
+    // D-107: Update Legislation
+    async fn update_legislation(&self, request: Request<LegislativeUpdate>) -> Result<Response<Ack>, Status> {
+        let req = request.into_inner();
+        let mut w = self.state.write().map_err(|_| Status::internal("Lock poisoned"))?;
+        
+        let bias = StrategicBias::from(req.bias.as_str());
+        w.legislation.bias = bias.clone();
+        w.legislation.aggression = req.aggression;
+        w.legislation.maker_only = req.maker_only;
+        w.legislation.hibernation = req.hibernation;
+
+        // D-107: Snap-to-Break-Even Command (One-shot)
+        if req.snap_to_breakeven {
+            tracing::info!("🛡️ SNAP-TO-BREAK-EVEN TRIGGERED");
+            // In a real implementation, this would trigger an async task to move stops.
+            // For now, we just log it.
+        }
+
+        tracing::info!(
+            "⚖️ LEGISLATION UPDATED: Bias={:?}, Aggression={:.2}, MakerOnly={}, Hibernation={}",
+            bias, req.aggression, req.maker_only, req.hibernation
+        );
+
+        Ok(Response::new(Ack { success: true, message: "Legislation Updated".into() }))
     }
 
     // --- Legacy Stubs ---
@@ -285,6 +362,9 @@ impl ReflexService for ReflexServerImpl {
                             unrealized_pnl: state.account.unrealized_pnl,
                             equity: state.account.equity,
                             balance: state.account.balance,
+                            // D-104
+                            realized_pnl: state.account.realized_pnl,
+                            btc_position: state.account.btc_position,
 
                             // Model
                             gemma_tokens_per_sec: state.gemma.tokens_per_sec,
@@ -311,6 +391,10 @@ impl ReflexService for ReflexServerImpl {
                             
                             // D-90: Recursive Risk Re-balancer Fidelity
                             system_sanity_score: state.governance.system_sanity_score,
+
+                            // D-105: Fiscal Control Deck
+                            positions: state.account.active_positions.clone(),
+                            orders: state.account.open_orders.clone(),
                         })
                     },
                     Err(_) => Err(Status::internal("Lagged")),

@@ -117,4 +117,38 @@ impl Sim2RealAuditor {
         info!("✅ Friction Stress: PASSED (Omega > 1.0 in target scenarios)");
         true
     }
+
+    /// D-101: Analyze Monte Carlo Results (Alpha-Reality Gap)
+    /// Input: Vector of (Optimistic NAV, Pessimistic NAV)
+    pub fn analyze_monte_carlo_results(&self, results: &[(f64, f64)]) -> (f64, f64, bool) {
+        info!("🎲 Analyzing {} Monte Carlo Permutations...", results.len());
+        
+        let mut total_gap = 0.0;
+        let mut ruin_events = 0;
+        
+        for (opt, pess) in results {
+            let gap = (opt - pess) / opt; // % Deviation
+            total_gap += gap;
+            
+            if *pess <= 0.0 {
+                ruin_events += 1;
+            }
+        }
+        
+        let avg_gap = total_gap / results.len() as f64;
+        let p_ruin = ruin_events as f64 / results.len() as f64;
+        
+        info!("📊 Alpha-Reality Gap: {:.2}%", avg_gap * 100.0);
+        info!("💀 Prob. of Ruin (E_ruin): {:.2}%", p_ruin * 100.0);
+        
+        let passed = avg_gap < 0.30 && p_ruin < 0.05; // Max 30% Gap, Max 5% Ruin Chance
+        
+        if passed {
+            info!("✅ Monte Carlo Sensitivity: PASSED");
+        } else {
+            error!("❌ Monte Carlo Sensitivity: FAILED (Gap > 30% or Ruin > 5%)");
+        }
+        
+        (avg_gap, p_ruin, passed)
+    }
 }
