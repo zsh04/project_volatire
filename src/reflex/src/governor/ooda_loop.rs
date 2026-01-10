@@ -86,6 +86,7 @@ pub struct OODACore {
     pub binary_packer: BinaryPacker, // D-94
     pub ensemble_manager: EnsembleManager, // D-95
     pub phoenix_monitor: PhoenixMonitor, // D-96
+    pub symbol: String,
     pub forensic_tx: Option<mpsc::Sender<DecisionPacket>>,
     pub mirror_tx: Option<mpsc::Sender<DecisionPacket>>,
     pub decay_tx: Option<mpsc::Sender<DecisionPacket>>,
@@ -95,6 +96,7 @@ use crate::client::BrainClient;
 
 impl OODACore {
     pub fn new(
+        symbol: String,
         forensic_tx: Option<mpsc::Sender<DecisionPacket>>,
         mirror_tx: Option<mpsc::Sender<DecisionPacket>>,
         decay_tx: Option<mpsc::Sender<DecisionPacket>>
@@ -107,13 +109,14 @@ impl OODACore {
             nullifier: Nullifier::new(), // D-88
             red_team: RedTeam::new(), // D-93
             sync_gate: SyncGate::new(), // D-91
-            shadow_gate: ShadowGate::new(), // D-92
+            shadow_gate: ShadowGate::new(symbol.clone()), // D-92
             binary_packer: BinaryPacker::new(), // D-94
             ensemble_manager: EnsembleManager::new(), // D-95
             phoenix_monitor: PhoenixMonitor::new(), // D-96
             forensic_tx,
             mirror_tx,
             decay_tx,
+            symbol,
         }
     }
 
@@ -469,7 +472,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_veto_logic() {
-        let mut core = OODACore::new(None, None, None);
+        let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None);
         
         // Case: Bullish Physics
         // Case: Bullish Physics
@@ -496,7 +499,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_jitter_fallback_logic() {
-        let mut core = OODACore::new(None, None, None);
+        let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None);
         let physics = PhysicsState {
             price: 50000.0,
             velocity: 10.0,
@@ -529,7 +532,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cycle_latency() {
-        let mut core = OODACore::new(None, None, None);
+        let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None);
         let physics = PhysicsState {
             price: 50000.0,
             velocity: 0.0,

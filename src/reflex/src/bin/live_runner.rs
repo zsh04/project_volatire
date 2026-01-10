@@ -107,6 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // --- OODA Core Initialization ---
     let mut ooda = governor::ooda_loop::OODACore::new(
+        live_symbol.clone(),
         Some(forensic_tx),
         Some(mirror_tx),
         Some(decay_tx)
