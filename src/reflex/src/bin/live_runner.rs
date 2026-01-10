@@ -107,6 +107,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // --- OODA Core Initialization ---
     let mut ooda = governor::ooda_loop::OODACore::new(
+        live_symbol.clone(),
         Some(forensic_tx),
         Some(mirror_tx),
         Some(decay_tx)
@@ -166,16 +167,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // Archive Tick to Historian (D-50)
-        let _ilp_line = format!(
-            "live_ticks,symbol={} price={},qty={} {}",
-            live_symbol.to_uppercase(),
+        auditor.log_tick(
+            &live_symbol.to_uppercase(),
             tick.price,
             tick.quantity,
-            (tick.timestamp * 1_000_000.0) as u64
+            (tick.timestamp * 1_000_000.0) as u64,
         );
-        // QuestBridge has no send() method - using the bridge directly would require ILP sender
-        // For now, skip archiving until we verify the API
-        // TODO: Check if QuestBridge has ILP sender method
         
         // Physics Update
         let spread = if let (Some(b), Some(a)) = (tick.bid, tick.ask) { a - b } else { 0.0 };

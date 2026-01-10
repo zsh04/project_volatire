@@ -267,7 +267,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Update OODA Core with Decay Channel
-    let mut ooda = reflex::governor::ooda_loop::OODACore::new(Some(forensic_tx), Some(mirror_tx), Some(decay_tx));
+    let mut ooda = reflex::governor::ooda_loop::OODACore::new("BTC-USDT".to_string(), Some(forensic_tx), Some(mirror_tx), Some(decay_tx));
 
     // Spawn API Server
     let server_state = shared_state.clone();
@@ -454,15 +454,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         
-        // D-86: Tactical Pause - Continue monitoring but block trading
-        if authority_bridge.is_paused() {
-            tracing::debug!("⏸️ Tactical Pause active - updating HUD only");
-            // TODO: Update physics & Gemma but skip Gateway
-            // For now, sleep and continue
-            tokio::time::sleep(Duration::from_millis(19)).await;
-            continue;
-        }
-        
         // D-83: Check for Ignition Request from API
         if let Ok(mut w) = shared_state.write() {
             if w.ignition_request {
@@ -492,12 +483,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _enter = span.enter();
 
         // --- Directive-72: LIVE DATA ORIGIN ---
-        let price = if is_sim_mode_flag {
+        let (price, volume) = if is_sim_mode_flag {
              let phase = (now_ms / 1000.0) * std::f64::consts::PI; 
              let signal = phase.sin() * 5.0;
              let noise = (rand::random::<f64>() - 0.5) * 2.0;
              let spike = if now_ms > 5000.0 && now_ms < 5500.0 { 10.0 } else { 0.0 };
-             100.0 + signal + noise + spike
+             let p = 100.0 + signal + noise + spike;
+             let v = rand::thread_rng().gen_range(0.1..5.0);
+             (p, v)
         } else {
              match tokio::time::timeout(Duration::from_millis(100), ingest_rx.recv()).await {
                  Ok(Some(tick)) => {
@@ -511,7 +504,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                  },
                  Err(_) => {
                      now_ms += 100.0;
-                     market.price 
+                     (market.price, 0.0)
                  }
              }
         };
@@ -527,7 +520,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             reflex::historian::events::MarketTickEvent {
                 timestamp: now_ms as u64,
                 price: price,
-                volume: 0.0, // TODO: Ingest volume
+                volume: volume,
             }
         ));
 
@@ -597,7 +590,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         // 4. ACT (Execution)
-        ooda.act(decision.clone(), price);
+        // D-86: Tactical Pause - Skip Gateway if paused
+        if !authority_bridge.is_paused() {
+            ooda.act(decision.clone(), price);
+        } else {
+             tracing::debug!("⏸️ Tactical Pause - Skipping Gateway Execution");
+        }
 
         // Update Shared State (For API)
         if let Ok(mut w) = shared_state.write() {
