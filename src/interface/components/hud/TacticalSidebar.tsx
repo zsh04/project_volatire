@@ -80,18 +80,27 @@ export function TacticalSidebar() {
                 <div className="grid grid-cols-3 gap-1">
                     <button
                         onClick={() => handleBiasChange('LONG_ONLY')}
+                        aria-label="Set bias to Long Only"
+                        title="Long Only Bias"
+                        aria-pressed={legislation.bias === 'LONG_ONLY'}
                         className={`p-2 flex justify-center items-center border border-zinc-800 rounded hover:border-emerald-500/50 transition-colors ${legislation.bias === 'LONG_ONLY' ? 'bg-emerald-900/30 border-emerald-500 text-emerald-400' : 'text-zinc-600'}`}
                     >
                         <TrendingUp className="w-4 h-4" />
                     </button>
                     <button
                         onClick={() => handleBiasChange('NEUTRAL')}
+                        aria-label="Set bias to Neutral"
+                        title="Neutral Bias"
+                        aria-pressed={legislation.bias === 'NEUTRAL'}
                         className={`p-2 flex justify-center items-center border border-zinc-800 rounded hover:border-emerald-500/50 transition-colors ${legislation.bias === 'NEUTRAL' ? 'bg-zinc-800 border-zinc-600 text-zinc-300' : 'text-zinc-600'}`}
                     >
                         <Activity className="w-4 h-4" />
                     </button>
                     <button
                         onClick={() => handleBiasChange('SHORT_ONLY')}
+                        aria-label="Set bias to Short Only"
+                        title="Short Only Bias"
+                        aria-pressed={legislation.bias === 'SHORT_ONLY'}
                         className={`p-2 flex justify-center items-center border border-zinc-800 rounded hover:border-red-500/50 transition-colors ${legislation.bias === 'SHORT_ONLY' ? 'bg-red-900/30 border-red-500 text-red-400' : 'text-zinc-600'}`}
                     >
                         <TrendingDown className="w-4 h-4" />
@@ -135,6 +144,8 @@ export function TacticalSidebar() {
                             <button
                                 key={risk.level}
                                 onClick={() => setRiskCap(isCap ? null : risk.id)} // Toggle off if clicked again
+                                aria-label={`Set risk cap to ${risk.level}`}
+                                aria-pressed={isCap}
                                 className={cn(
                                     "w-full h-8 rounded flex items-center justify-between px-2 relative transition-all duration-200 group border border-transparent",
                                     isCap ? "bg-red-500/20 border-red-500" :
@@ -164,6 +175,7 @@ export function TacticalSidebar() {
             <div className="space-y-2 pt-2 border-t border-white/5">
                 <button
                     onClick={() => handleToggle('makerOnly')}
+                    aria-pressed={legislation.makerOnly}
                     className={`w-full flex items-center justify-between p-2 rounded border transition-colors ${legislation.makerOnly ? 'border-amber-500/50 bg-amber-900/10 text-amber-400' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
                 >
                     <span className="text-xs font-mono">MAKER ONLY</span>
@@ -172,6 +184,7 @@ export function TacticalSidebar() {
 
                 <button
                     onClick={() => handleToggle('hibernation')}
+                    aria-pressed={legislation.hibernation}
                     className={`w-full flex items-center justify-between p-2 rounded border transition-colors ${legislation.hibernation ? 'border-purple-500/50 bg-purple-900/10 text-purple-400' : 'border-zinc-800 text-zinc-500 hover:border-zinc-700'}`}
                 >
                     <span className="text-xs font-mono">HIBERNATE</span>
