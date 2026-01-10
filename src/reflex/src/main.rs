@@ -376,7 +376,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut ignition = reflex::governor::ignition::IgnitionSequence::new();
 
     // D-86: Authority Bridge (Sovereign Command Channel)
-    let (mut authority_bridge, _authority_tx) = reflex::governor::authority::AuthorityBridge::new();
+    let (mut authority_bridge, authority_tx) = reflex::governor::authority::AuthorityBridge::new();
     // TODO: Pass authority_tx to gRPC server for command injection
 
     // D-90: Rebalancer (The Governor)
