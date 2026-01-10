@@ -178,7 +178,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // TODO: Check if QuestBridge has ILP sender method
         
         // Physics Update
-        let physics = feynman.update(tick.price, tick.timestamp, 0);
+        let spread = if let (Some(b), Some(a)) = (tick.bid, tick.ask) { a - b } else { 0.0 };
+        let physics = feynman.update(tick.price, tick.timestamp, 0, spread);
 
         // OODA Orient
         let ooda_state = ooda.orient(physics.clone(), 0, brain_client.as_mut(), "NEUTRAL".to_string()).await;

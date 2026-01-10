@@ -502,6 +502,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
              match tokio::time::timeout(Duration::from_millis(100), ingest_rx.recv()).await {
                  Ok(Some(tick)) => {
                      now_ms = tick.timestamp as f64;
+                     market.update_book(tick.bid, tick.ask);
                      tick.price
                  },
                  Ok(None) => {
@@ -532,7 +533,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // D-79: Generate GSID
         let seq_id = sequencer.next();
-        let state = feynman.update(market.price, now_ms, seq_id);
+        let spread = market.get_spread();
+        let state = feynman.update(market.price, now_ms, seq_id, spread);
         metrics.market_velocity.record(state.velocity, &kv);
         
         reflex::historian::logger::record_event(reflex::historian::events::LogEvent::Signal(

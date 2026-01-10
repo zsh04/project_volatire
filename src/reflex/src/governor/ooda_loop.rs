@@ -148,7 +148,7 @@ impl OODACore {
                 jerk: physics.jerk,
                 sentiment_score: 0.0, // Initial seed
                 mid_price: physics.price,
-                bid_ask_spread: 0.0, // TODO: Ingest spread
+                bid_ask_spread: physics.bid_ask_spread,
                 regime_id,
                 sequence_id: 0,      // TODO: Pass sequence_id
             };

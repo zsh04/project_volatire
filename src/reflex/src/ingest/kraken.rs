@@ -44,31 +44,29 @@ async fn connect_kraken_loop(url: &Url, pair: &str, tx: &mpsc::Sender<Tick>)
     
     let (mut write, mut read) = ws_stream.split();
     
-    // Subscribe to trade feed
-    // Kraken format: {"event":"subscribe","pair":["XBT/USD"],"subscription":{"name":"trade"}}
+    // Subscribe to ticker feed (provides spread)
+    // Kraken format: {"event":"subscribe","pair":["XBT/USD"],"subscription":{"name":"ticker"}}
     let subscribe_msg = serde_json::json!({
         "event": "subscribe",
         "pair": [pair],
         "subscription": {
-            "name": "trade"
+            "name": "ticker"
         }
     });
     
     let sub_text = serde_json::to_string(&subscribe_msg)?;
     write.send(Message::Text(sub_text)).await?;
-    info!("Kraken Ingest: Subscribed to {} trades", pair);
+    info!("Kraken Ingest: Subscribed to {} ticker", pair);
     
     while let Some(msg) = read.next().await {
         let msg = msg?;
 
         match msg {
             Message::Text(text) => {
-                // Try to parse as trade message
-                if let Some(ticks) = kraken::parse_kraken_trade(&text) {
-                    for tick in ticks {
-                        if let Err(e) = tx.send(tick).await {
-                            return Err(format!("Channel closed: {}", e).into());
-                        }
+                // Try to parse as ticker message
+                if let Some(tick) = kraken::parse_kraken_ticker(&text) {
+                    if let Err(e) = tx.send(tick).await {
+                        return Err(format!("Channel closed: {}", e).into());
                     }
                 }
                 // Ignore subscription confirmations and heartbeats
