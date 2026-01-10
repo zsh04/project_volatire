@@ -138,6 +138,7 @@ mod tests {
             entropy: 0.8,
             efficiency_index: 0.9,
             basis: 0.0,
+            bid_ask_spread: 0.05,
             sequence_id: 0,
         };
 
@@ -169,6 +170,7 @@ mod tests {
             entropy: 0.8,
             efficiency_index: 0.9,
             basis: 0.0,
+            bid_ask_spread: 0.05,
             sequence_id: 0,
         };
 

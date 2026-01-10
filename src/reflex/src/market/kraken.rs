@@ -25,6 +25,68 @@ pub struct KrakenEvent {
     pub subscription: Option<serde_json::Value>,
 }
 
+// Kraken ticker format:
+// [
+//   channelID,
+//   {
+//     "a": ["52609.60000", 0, "0.400"],
+//     "b": ["52609.50000", 0, "0.400"],
+//     "c": ["52609.60000", "0.00000000"],
+//     "v": ["3736.21980665", "5318.57777176"],
+//     "p": ["52932.96200", "52857.25197"],
+//     "t": [30896, 45296],
+//     "l": ["51655.00000", "51655.00000"],
+//     "h": ["53555.00000", "53555.00000"],
+//     "o": ["52329.80000", "52062.40000"]
+//   },
+//   "ticker",
+//   "XBT/USD"
+// ]
+pub fn parse_kraken_ticker(msg: &str) -> Option<Tick> {
+    let value: serde_json::Value = serde_json::from_str(msg).ok()?;
+
+    if !value.is_array() {
+        return None;
+    }
+
+    let arr = value.as_array()?;
+    if arr.len() < 4 {
+        return None;
+    }
+
+    // Check if channel name is "ticker"
+    if let Some(channel_name) = arr.get(2).and_then(|v| v.as_str()) {
+        if channel_name != "ticker" {
+            return None;
+        }
+    } else {
+        return None;
+    }
+
+    // Extract ticker object (index 1)
+    let ticker = arr.get(1)?.as_object()?;
+
+    // Last Trade Price (c[0])
+    let c_arr = ticker.get("c")?.as_array()?;
+    let price: f64 = c_arr.get(0)?.as_str()?.parse().ok()?;
+
+    // Best Ask (a[0])
+    let a_arr = ticker.get("a")?.as_array()?;
+    let ask: f64 = a_arr.get(0)?.as_str()?.parse().ok()?;
+
+    // Best Bid (b[0])
+    let b_arr = ticker.get("b")?.as_array()?;
+    let bid: f64 = b_arr.get(0)?.as_str()?.parse().ok()?;
+
+    Some(Tick {
+        timestamp: std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as f64,
+        price,
+        quantity: 0.0, // Ticker update doesn't have last trade volume in a simple way (c[1] is volume of last trade)
+        bid: Some(bid),
+        ask: Some(ask),
+    })
+}
+
 // Kraken trade format: [channelID, [[price, volume, time, side, orderType, misc]], channelName, pair]
 pub fn parse_kraken_trade(msg: &str) -> Option<Vec<Tick>> {
     let value: serde_json::Value = serde_json::from_str(msg).ok()?;
@@ -65,6 +127,8 @@ pub fn parse_kraken_trade(msg: &str) -> Option<Vec<Tick>> {
             timestamp: timestamp * 1000.0, // Convert to milliseconds
             price,
             quantity: volume,
+            bid: None,
+            ask: None,
         });
     }
     
@@ -83,5 +147,15 @@ mod tests {
         assert_eq!(ticks.len(), 1);
         assert_eq!(ticks[0].price, 50000.10);
         assert_eq!(ticks[0].quantity, 0.05);
+    }
+
+    #[test]
+    fn test_parse_kraken_ticker() {
+        let msg = r#"[345,{"a":["52609.60000",0,"0.400"],"b":["52609.50000",0,"0.400"],"c":["52609.60000","0.00000000"],"v":["3736.21980665","5318.57777176"],"p":["52932.96200","52857.25197"],"t":[30896,45296],"l":["51655.00000","51655.00000"],"h":["53555.00000","53555.00000"],"o":["52329.80000","52062.40000"]},"ticker","XBT/USD"]"#;
+        let tick = parse_kraken_ticker(msg).unwrap();
+
+        assert_eq!(tick.price, 52609.60);
+        assert_eq!(tick.ask, Some(52609.60));
+        assert_eq!(tick.bid, Some(52609.50));
     }
 }

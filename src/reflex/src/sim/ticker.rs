@@ -120,6 +120,8 @@ impl SimTicker {
                     timestamp: ts_millis,
                     price,
                     quantity: volume,
+                    bid: None,
+                    ask: None,
                 }
             });
 
@@ -230,6 +232,8 @@ impl SimTicker {
                                             timestamp: (ts.value(i) / 1000) as f64,
                                             price: close.value(i),
                                             quantity: vol.value(i),
+                                            bid: None,
+                                            ask: None,
                                         }));
                                     }
                                     stream::iter(ticks)

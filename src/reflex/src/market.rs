@@ -13,6 +13,8 @@ pub struct Tick {
     pub timestamp: f64, // Unix Timestamp (ms)
     pub price: f64,
     pub quantity: f64,
+    pub bid: Option<f64>,
+    pub ask: Option<f64>,
 }
 
 // ==============================================================================
@@ -48,6 +50,8 @@ impl BinanceTradeEvent {
             timestamp: self.trade_time as f64,
             price,
             quantity,
+            bid: None,
+            ask: None,
         })
     }
 }
@@ -57,14 +61,32 @@ impl BinanceTradeEvent {
 // ==============================================================================
 pub struct MarketData {
     pub price: f64,
+    pub best_bid: Option<f64>,
+    pub best_ask: Option<f64>,
 }
 
 impl MarketData {
     pub fn new() -> Self {
-        Self { price: 0.0 }
+        Self {
+            price: 0.0,
+            best_bid: None,
+            best_ask: None,
+        }
     }
     
     pub fn update_price(&mut self, price: f64) {
         self.price = price;
+    }
+
+    pub fn update_book(&mut self, bid: Option<f64>, ask: Option<f64>) {
+        if let Some(b) = bid { self.best_bid = Some(b); }
+        if let Some(a) = ask { self.best_ask = Some(a); }
+    }
+
+    pub fn get_spread(&self) -> f64 {
+        match (self.best_bid, self.best_ask) {
+            (Some(b), Some(a)) => a - b,
+            _ => 0.0,
+        }
     }
 }
