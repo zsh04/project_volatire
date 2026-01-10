@@ -1,4 +1,5 @@
 use reflex::governor::ooda_loop::{OODACore, PhysicsState, OODAState};
+use reflex::governor::legislator::LegislativeState;
 use reflex::telemetry;
 use std::time::Duration;
 use tracing::info;

@@ -20,16 +20,30 @@ pub struct FrictionLog {
     pub tax_buffer: f64, // D-27
 }
 
+#[derive(Debug, Clone)]
+pub struct TickLog {
+    pub symbol: String,
+    pub price: f64,
+    pub quantity: f64,
+    pub ts: i64, // nanos
+}
+
+#[derive(Debug, Clone)]
+pub enum AuditLog {
+    Friction(FrictionLog),
+    Tick(TickLog),
+}
+
 #[derive(Clone)]
 pub struct QuestBridge {
-    ilp_sender: mpsc::Sender<FrictionLog>,
+    ilp_sender: mpsc::Sender<AuditLog>,
     sql_pool: Pool,
 }
 
 impl QuestBridge {
     pub async fn new(ilp_host: &str, sql_host: &str, user: &str, pass: &str, db: &str) -> Self {
         // 1. ILP Channel Setup
-        let (tx, mut rx) = mpsc::channel::<FrictionLog>(4096);
+        let (tx, mut rx) = mpsc::channel::<AuditLog>(4096);
         let ilp_host_owned = ilp_host.to_string();
 
         // 2. Spawn ILP Worker
@@ -48,25 +62,36 @@ impl QuestBridge {
             // QuestDB requires a separate Buffer for serialization
             let mut buffer = Buffer::new(ProtocolVersion::V3);
 
-            while let Some(log) = rx.recv().await {
+            while let Some(msg) = rx.recv().await {
                 // Serialize into Buffer
                 let serialization_result = (|| -> Result<(), questdb::Error> {
-                    let row = buffer.table("friction_ledger")? 
-                        .symbol("symbol", &log.symbol)?
-                        .symbol("order_id", &log.order_id)? 
-                        .symbol("side", &log.side)?
-                        .column_f64("intent_qty", log.intent_qty)?
-                        .column_f64("fill_price", log.fill_price)?
-                        .column_f64("slippage_bps", log.slippage_bps)?
-                        .column_f64("gas_usd", log.gas_usd)?
-                        .column_f64("realized_pnl", log.realized_pnl)?
-                        .column_f64("fee_native", log.fee_native)?
-                        .column_f64("tax_buffer", log.tax_buffer)?;
-                    
-                    if let Some(ts) = log.ts {
-                        row.at(TimestampNanos::new(ts))?;
-                    } else {
-                        row.at_now()?;
+                    match msg {
+                        AuditLog::Friction(log) => {
+                            let row = buffer.table("friction_ledger")?
+                                .symbol("symbol", &log.symbol)?
+                                .symbol("order_id", &log.order_id)?
+                                .symbol("side", &log.side)?
+                                .column_f64("intent_qty", log.intent_qty)?
+                                .column_f64("fill_price", log.fill_price)?
+                                .column_f64("slippage_bps", log.slippage_bps)?
+                                .column_f64("gas_usd", log.gas_usd)?
+                                .column_f64("realized_pnl", log.realized_pnl)?
+                                .column_f64("fee_native", log.fee_native)?
+                                .column_f64("tax_buffer", log.tax_buffer)?;
+
+                            if let Some(ts) = log.ts {
+                                row.at(TimestampNanos::new(ts))?;
+                            } else {
+                                row.at_now()?;
+                            }
+                        },
+                        AuditLog::Tick(log) => {
+                            buffer.table("live_ticks")?
+                                .symbol("symbol", &log.symbol)?
+                                .column_f64("price", log.price)?
+                                .column_f64("qty", log.quantity)?
+                                .at(TimestampNanos::new(log.ts))?;
+                        }
                     }
                     Ok(())
                 })();
@@ -101,12 +126,28 @@ impl QuestBridge {
         }
     }
     
-    /// Fire-and-forget logging to the ILP worker.
+    /// Fire-and-forget logging to the ILP worker (FrictionLog).
     pub fn log(&self, log: FrictionLog) {
         let sender = self.ilp_sender.clone();
         tokio::spawn(async move {
-            if let Err(e) = sender.send(log).await {
+            if let Err(e) = sender.send(AuditLog::Friction(log)).await {
                 error!("Failed to queue audit log: {}", e);
+            }
+        });
+    }
+
+    /// Fire-and-forget logging of Ticks.
+    pub fn log_tick(&self, symbol: &str, price: f64, quantity: f64, ts_nanos: u64) {
+        let sender = self.ilp_sender.clone();
+        let log = TickLog {
+            symbol: symbol.to_string(),
+            price,
+            quantity,
+            ts: ts_nanos as i64,
+        };
+        tokio::spawn(async move {
+            if let Err(e) = sender.send(AuditLog::Tick(log)).await {
+                error!("Failed to queue tick log: {}", e);
             }
         });
     }
