@@ -63,6 +63,16 @@ export async function POST(request: Request): Promise<NextResponse<SovereignComm
             }
         }
 
+        // Special Case: VERIFY command
+        // If we reached this point, the key is valid.
+        if (req.command === 'VERIFY') {
+            const latency_ms = Date.now() - startTime;
+            return NextResponse.json({
+                success: true,
+                latency_ms,
+            });
+        }
+
         // Forward to Reflex via gRPC
         const grpcUrl = process.env.REFLEX_GRPC_URL || 'http://localhost:50051';
 
