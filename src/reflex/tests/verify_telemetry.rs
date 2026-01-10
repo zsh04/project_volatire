@@ -15,6 +15,7 @@ async fn test_telemetry_emission() {
 
     // 2. Setup OODA
     let mut ooda = OODACore::new(None, None, None);
+    let legislation = LegislativeState::default();
     
     // 3. Create Mock State
     let physics = PhysicsState {

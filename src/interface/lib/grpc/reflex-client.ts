@@ -175,6 +175,7 @@ export async function triggerVeto(reason: string, operator: string): Promise<boo
     });
 }
 
+// D-109: Cancel Order
 export async function closePosition(symbol: string): Promise<boolean> {
     const client = getReflexClient();
 
@@ -188,7 +189,7 @@ export async function closePosition(symbol: string): Promise<boolean> {
                 reject(err);
                 return;
             }
-            console.log(`[D-106] Position closed for ${symbol}: ${response.getMessage()}`);
+            console.log(`Position closed for ${symbol}: ${response.getMessage()}`);
             resolve(response.getSuccess());
         });
     });

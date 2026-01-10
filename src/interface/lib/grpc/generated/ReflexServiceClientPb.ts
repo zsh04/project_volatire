@@ -168,6 +168,49 @@ export class ReflexServiceClient {
     this.methodDescriptorTriggerVeto);
   }
 
+  methodDescriptorCancelOrder = new grpcWeb.MethodDescriptor(
+    '/reflex.ReflexService/CancelOrder',
+    grpcWeb.MethodType.UNARY,
+    reflex_pb.CancelOrderRequest,
+    reflex_pb.Ack,
+    (request: reflex_pb.CancelOrderRequest) => {
+      return request.serializeBinary();
+    },
+    reflex_pb.Ack.deserializeBinary
+  );
+
+  cancelOrder(
+    request: reflex_pb.CancelOrderRequest,
+    metadata?: grpcWeb.Metadata | null): Promise<reflex_pb.Ack>;
+
+  cancelOrder(
+    request: reflex_pb.CancelOrderRequest,
+    metadata: grpcWeb.Metadata | null,
+    callback: (err: grpcWeb.RpcError,
+               response: reflex_pb.Ack) => void): grpcWeb.ClientReadableStream<reflex_pb.Ack>;
+
+  cancelOrder(
+    request: reflex_pb.CancelOrderRequest,
+    metadata?: grpcWeb.Metadata | null,
+    callback?: (err: grpcWeb.RpcError,
+               response: reflex_pb.Ack) => void) {
+    if (callback !== undefined) {
+      return this.client_.rpcCall(
+        this.hostname_ +
+          '/reflex.ReflexService/CancelOrder',
+        request,
+        metadata || {},
+        this.methodDescriptorCancelOrder,
+        callback);
+    }
+    return this.client_.unaryCall(
+    this.hostname_ +
+      '/reflex.ReflexService/CancelOrder',
+    request,
+    metadata || {},
+    this.methodDescriptorCancelOrder);
+  }
+
   methodDescriptorDemoteProvisional = new grpcWeb.MethodDescriptor(
     '/reflex.ReflexService/DemoteProvisional',
     grpcWeb.MethodType.UNARY,

@@ -298,6 +298,31 @@ impl ReflexService for ReflexServerImpl {
         Ok(Response::new(Ack { success: true, message: "Ignition Sequence Initiated".into() }))
     }
 
+    // D-109: Cancel Order (Tactical)
+    async fn cancel_order(&self, request: Request<CancelOrderRequest>) -> Result<Response<Ack>, Status> {
+        let req = request.into_inner();
+        let order_id = req.order_id;
+
+        tracing::info!("❌ TACTICAL CANCEL REQUEST: {}", order_id);
+
+        if let Some(client) = &self.kraken {
+             match client.cancel_order(&order_id).await {
+                 Ok(res) => {
+                     tracing::info!("✅ Cancel Confirmed: {}", res);
+                     Ok(Response::new(Ack { success: true, message: "Order Cancelled".into() }))
+                 },
+                 Err(e) => {
+                     tracing::error!("❌ Cancel Failed: {}", e);
+                     Err(Status::internal(format!("Cancel Failed: {}", e)))
+                 }
+             }
+        } else {
+             // If we are in SIM mode, just log it.
+             tracing::warn!("⚠️ CANCEL RECEIVED IN SIM/OFFLINE MODE. LOGGING ONLY.");
+             Ok(Response::new(Ack { success: true, message: "Simulated Cancel".into() }))
+        }
+    }
+
     // D-107: Update Legislation
     async fn update_legislation(&self, request: Request<LegislativeUpdate>) -> Result<Response<Ack>, Status> {
         let req = request.into_inner();
@@ -494,6 +519,13 @@ pub async fn run_server(
     // 1. gRPC Server
     let grpc_state = state.clone();
     let grpc_tx = tx.clone();
+
+    // D-109: Execution Client (Optional)
+    let kraken_client = match KrakenClient::new() {
+        Ok(c) => Some(Arc::new(c)),
+        Err(_) => None,
+    };
+
     let grpc_addr = "0.0.0.0:50051".parse().unwrap();
     let reflex_service = crate::reflex_proto::reflex_service_server::ReflexServiceServer::new(ReflexServerImpl { 
         state: grpc_state,

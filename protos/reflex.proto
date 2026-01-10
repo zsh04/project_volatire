@@ -12,6 +12,9 @@ service ReflexService {
   // 3. Trigger Veto (Nuclear Option)
   rpc TriggerVeto (VetoRequest) returns (Ack);
 
+  // 3.5 Cancel Order (Tactical)
+  rpc CancelOrder (CancelOrderRequest) returns (Ack);
+
   // 4. Demote Provisional (Safety Staircase)
   rpc DemoteProvisional (DemoteRequest) returns (Ack);
 
