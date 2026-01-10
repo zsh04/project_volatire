@@ -15,6 +15,9 @@ service ReflexService {
   // 3.5 Cancel Order (Tactical)
   rpc CancelOrder (CancelOrderRequest) returns (Ack);
 
+  // 3.6 Close Position (Tactical)
+  rpc ClosePosition (ClosePositionRequest) returns (Ack);
+
   // 4. Demote Provisional (Safety Staircase)
   rpc DemoteProvisional (DemoteRequest) returns (Ack);
 
@@ -45,6 +48,11 @@ message TickHistoryRequest {
     string symbol = 1;
     double start_time = 2; // Unix ms
     double end_time = 3;   // Unix ms
+}
+
+message CancelOrderRequest {
+    string order_id = 1;
+    string symbol = 2;
 }
 
 message ClosePositionRequest {

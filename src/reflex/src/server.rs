@@ -17,6 +17,9 @@ use crate::reflex_proto::{
     SovereignCommandRequest,
     sovereign_command_request::CommandType,
 };
+use crate::reflex_proto::CancelOrderRequest;
+use crate::execution::kraken::KrakenClient;
+
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
 use crate::feynman::PhysicsState;
@@ -115,6 +118,7 @@ pub struct ReflexServerImpl {
     pub state: SafeState,
     pub tx: broadcast::Sender<SharedState>,
     pub authority_tx: mpsc::UnboundedSender<SovereignCommand>,
+    pub kraken: Option<Arc<KrakenClient>>,
 }
 
 #[tonic::async_trait]
@@ -122,8 +126,8 @@ impl ReflexService for ReflexServerImpl {
     // D-86: Inject Sovereign Command
     async fn inject_sovereign_command(&self, request: Request<SovereignCommandRequest>) -> Result<Response<Ack>, Status> {
         let req = request.into_inner();
-        let cmd_type = CommandType::from_i32(req.r#type)
-            .ok_or_else(|| Status::invalid_argument("Invalid Command Type"))?;
+        let cmd_type = CommandType::try_from(req.r#type)
+            .map_err(|_| Status::invalid_argument("Invalid Command Type"))?;
 
         let cmd = match cmd_type {
              CommandType::Kill => SovereignCommand::Kill,
@@ -531,6 +535,7 @@ pub async fn run_server(
         state: grpc_state,
         tx: grpc_tx,
         authority_tx,
+        kraken: kraken_client,
     });
 
     tracing::info!("🚀 API Surface (gRPC) listening on {}", grpc_addr);

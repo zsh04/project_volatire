@@ -39,7 +39,7 @@ dotenvy = "0.15"
 questdb-rs = "6.1.0"
 tokio-postgres = "0.7.15"
 deadpool-postgres = "0.14"
-deadpool-redis = "0.10"
+deadpool-redis = "0.13"
 rmp-serde = "1.1" # MessagePack Serialization
 nix = { version = "0.27", features = ["socket", "uio", "fs", "process", "signal"] } # Unix Sockets & SCM_RIGHTS (D-81)
 memmap2 = "0.9" # Shared Memory (D-81)
@@ -54,7 +54,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-opentelemetry = "0.22"
 opentelemetry-appender-tracing = "0.2"
 # Connection Pooling
-redis = { version = "0.21.7", features = ["tokio-comp"] }
+redis = { version = "0.23", features = ["tokio-comp"] }
 # bincode removed in favor of MessagePack (D-42)
 
 # Zero-Copy Logging (D-82)
