@@ -492,17 +492,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _enter = span.enter();
 
         // --- Directive-72: LIVE DATA ORIGIN ---
-        let price = if is_sim_mode_flag {
+        let (price, volume) = if is_sim_mode_flag {
              let phase = (now_ms / 1000.0) * std::f64::consts::PI; 
              let signal = phase.sin() * 5.0;
              let noise = (rand::random::<f64>() - 0.5) * 2.0;
              let spike = if now_ms > 5000.0 && now_ms < 5500.0 { 10.0 } else { 0.0 };
-             100.0 + signal + noise + spike
+             let p = 100.0 + signal + noise + spike;
+             let v = rand::thread_rng().gen_range(0.1..5.0);
+             (p, v)
         } else {
              match tokio::time::timeout(Duration::from_millis(100), ingest_rx.recv()).await {
                  Ok(Some(tick)) => {
                      now_ms = tick.timestamp as f64;
-                     tick.price
+                     (tick.price, tick.quantity)
                  },
                  Ok(None) => {
                      error!("❌ Ingestion Channel Closed!");
@@ -510,7 +512,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                  },
                  Err(_) => {
                      now_ms += 100.0;
-                     market.price 
+                     (market.price, 0.0)
                  }
              }
         };
@@ -526,7 +528,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             reflex::historian::events::MarketTickEvent {
                 timestamp: now_ms as u64,
                 price: price,
-                volume: 0.0, // TODO: Ingest volume
+                volume: volume,
             }
         ));
 
