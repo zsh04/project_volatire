@@ -267,7 +267,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Update OODA Core with Decay Channel
-    let mut ooda = reflex::governor::ooda_loop::OODACore::new(Some(forensic_tx), Some(mirror_tx), Some(decay_tx));
+    let mut ooda = reflex::governor::ooda_loop::OODACore::new("BTC-USDT".to_string(), Some(forensic_tx), Some(mirror_tx), Some(decay_tx));
 
     // Spawn API Server
     let server_state = shared_state.clone();
