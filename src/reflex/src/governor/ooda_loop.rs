@@ -14,6 +14,7 @@ pub struct OODAState {
     pub physics: PhysicsState,
     pub sentiment_score: Option<f64>, // Narrative (Hypatia)
     pub nearest_regime: Option<String>, // Memory (LanceDB)
+    pub vector_distance: Option<f64>, // Similarity Score
     pub oriented_at: Instant,
     pub trace_id: String, // Traceability link
     pub brain_latency: Option<f64>, // ms
@@ -51,6 +52,7 @@ impl Default for OODAState {
             physics: PhysicsState::default(),
             sentiment_score: None,
             nearest_regime: None,
+            vector_distance: None,
             oriented_at: Instant::now(),
             trace_id: String::new(),
             brain_latency: None,
@@ -138,7 +140,7 @@ impl OODACore {
         let trace_id = cx.span().span_context().trace_id().to_string();
 
         // 1. Asynchronous Fetch Logic
-        let (sentiment, regime, latency) = if let Some(c) = client {
+        let (sentiment, regime, latency, distance) = if let Some(c) = client {
             // LIVE PATH (D-54)
             // D-87: COGNITIVE FIREWALL - Construct Truth Envelope
             let mut truth = TruthEnvelope {
@@ -185,7 +187,7 @@ impl OODACore {
                     // 1. Latency Check (Atomic Clock)
                     if let Err(e) = self.sync_gate.measure_latency(_start) {
                         tracing::warn!("BTC-91 SyncGate Violation (Latency): {:?}", e);
-                        (None, None, None)
+                        (None, None, None, None)
                     } else {
                         // Map Proto ContextResponse to LlmInferenceResponse for validation
                         // We treat context info as "inference" for validation purposes
@@ -201,7 +203,7 @@ impl OODACore {
                         Ok(_) => {
                             self.nullifier.reset_continuity(); // D-88: Success resets counter
                             let lat = ctx.computation_time_ns as f64 / 1_000_000.0;
-                            (Some(ctx.sentiment_score), Some(ctx.nearest_regime), Some(lat))
+                            (Some(ctx.sentiment_score), Some(ctx.nearest_regime), Some(lat), Some(ctx.regime_distance))
                         },
                         Err(e) => {
                             // D-88: NULLIFICATION "THE ERASER"
@@ -212,18 +214,18 @@ impl OODACore {
                             }
                             
                             // Return BLIND STATE (Nullified)
-                            (None, None, None) 
+                            (None, None, None, None)
                         }
                     }
                 } // End SyncGate Else
                 },
                 Ok(Err(e)) => {
                     tracing::warn!("Brain Error: {}", e);
-                    (None, None, None) // Error -> Blind
+                    (None, None, None, None) // Error -> Blind
                 },
                 Err(_) => {
                     tracing::warn!("Brain Timeout (Jitter Violated)");
-                    (None, None, None) // Timeout -> Blind
+                    (None, None, None, None) // Timeout -> Blind
                 }
             }
         } else {
@@ -251,6 +253,7 @@ impl OODACore {
             physics,
             sentiment_score: sentiment,
             nearest_regime: regime,
+            vector_distance: distance,
             oriented_at: Instant::now(),
             trace_id,
             brain_latency: latency,
@@ -258,13 +261,13 @@ impl OODACore {
     }
 
     /// Mocks the external fetch to LanceDB / DistilBERT
-    fn fetch_semantics_simulated(&self) -> (Option<f64>, Option<String>, Option<f64>) {
+    fn fetch_semantics_simulated(&self) -> (Option<f64>, Option<String>, Option<f64>, Option<f64>) {
         // Simulate variability. 
         // Most of the time it's fast (cache), sometimes it lags.
         // For deterministic logic testing (not verify), we return instant mock.
         // For stress testing, we'd inject sleep.
         // Hardcoding a "Fast Path" scenario for default logic flow.
-        (Some(-0.8), Some("Liquidity Crisis 2020".to_string()), Some(12.5))
+        (Some(-0.8), Some("Liquidity Crisis 2020".to_string()), Some(12.5), Some(0.12))
     }
 
     /// ORIENT -> DECIDE
@@ -391,7 +394,7 @@ impl OODACore {
             trace_id: state.trace_id.clone(),
             physics: state.physics.clone(),
             sentiment: state.sentiment_score.unwrap_or(0.0),
-            vector_distance: 0.0, // TODO: Retrieve from Semantic Fetch
+            vector_distance: state.vector_distance.unwrap_or(0.0),
             quantile_score: self.provisional.current_tier_index as i32,
             decision: format!("{:?}", decision.action),
             operator_hash: String::new(),
@@ -466,12 +469,12 @@ impl OODACore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::governor::legislator::LegislativeState;
 
     #[tokio::test]
     async fn test_veto_logic() {
         let mut core = OODACore::new(None, None, None);
         
-        // Case: Bullish Physics
         // Case: Bullish Physics
         let physics = PhysicsState {
             price: 50000.0,
@@ -482,10 +485,10 @@ mod tests {
         };
 
         // Standard Orient (Simulated)
-        let state = core.orient(physics, 0, None).await;
+        let state = core.orient(physics, 0, None, "NEUTRAL".to_string()).await;
         
         // Decide
-        let decision = core.decide(&state);
+        let decision = core.decide(&state, &LegislativeState::default());
         
         // EXPECTATION: HOLD/VETO because Sentiment is Negative (-0.8)
         match decision.action {
@@ -510,11 +513,13 @@ mod tests {
             physics: physics.clone(),
             sentiment_score: None,
             nearest_regime: None,
+            vector_distance: None,
             oriented_at: Instant::now(),
             trace_id: "test_trace".to_string(),
+            brain_latency: None,
         };
 
-        let decision = core.decide(&blind_state);
+        let decision = core.decide(&blind_state, &LegislativeState::default());
         
         // Expectation: Buy, but with Reduced Size/Confidence (0.5 multiplier)
         if let Action::Buy(pct) = decision.action {
@@ -541,8 +546,8 @@ mod tests {
         let start = Instant::now();
         for _ in 0..10_000 {
             // Using logic internal simulation for speed test
-            let state = core.orient(physics.clone(), 0, None).await;
-            let dec = core.decide(&state);
+            let state = core.orient(physics.clone(), 0, None, "NEUTRAL".to_string()).await;
+            let dec = core.decide(&state, &LegislativeState::default());
             core.act(dec, physics.price);
         }
         let total = start.elapsed();
