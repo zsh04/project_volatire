@@ -482,10 +482,10 @@ mod tests {
         };
 
         // Standard Orient (Simulated)
-        let state = core.orient(physics, 0, None).await;
+        let state = core.orient(physics, 0, None, "Neutral".to_string()).await;
         
         // Decide
-        let decision = core.decide(&state);
+        let decision = core.decide(&state, &Default::default());
         
         // EXPECTATION: HOLD/VETO because Sentiment is Negative (-0.8)
         match decision.action {
@@ -512,9 +512,10 @@ mod tests {
             nearest_regime: None,
             oriented_at: Instant::now(),
             trace_id: "test_trace".to_string(),
+            brain_latency: None,
         };
 
-        let decision = core.decide(&blind_state);
+        let decision = core.decide(&blind_state, &Default::default());
         
         // Expectation: Buy, but with Reduced Size/Confidence (0.5 multiplier)
         if let Action::Buy(pct) = decision.action {
@@ -541,8 +542,8 @@ mod tests {
         let start = Instant::now();
         for _ in 0..10_000 {
             // Using logic internal simulation for speed test
-            let state = core.orient(physics.clone(), 0, None).await;
-            let dec = core.decide(&state);
+            let state = core.orient(physics.clone(), 0, None, "Neutral".to_string()).await;
+            let dec = core.decide(&state, &Default::default());
             core.act(dec, physics.price);
         }
         let total = start.elapsed();
