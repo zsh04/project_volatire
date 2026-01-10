@@ -19,6 +19,7 @@ use tokio_stream::wrappers::ReceiverStream;
 use crate::feynman::PhysicsState;
 use crate::governor::ooda_loop::OODAState;
 use crate::governor::legislator::{LegislativeState, StrategicBias};
+use crate::governor::authority::SovereignCommand;
 
 
 
@@ -110,6 +111,7 @@ struct KineticHUD {
 pub struct ReflexServerImpl {
     pub state: SafeState,
     pub tx: broadcast::Sender<SharedState>,
+    pub authority_tx: mpsc::UnboundedSender<SovereignCommand>,
 }
 
 #[tonic::async_trait]
@@ -296,12 +298,27 @@ impl ReflexService for ReflexServerImpl {
         tracing::info!("🔧 RATCHET TRIGGERED: Level {:?} | Reason: {}", req.level, req.reason);
 
         match req.level {
-            0 => {} // IDLE
-            1 => {} // TIGHTEN
-            2 => {} // FREEZE
+            0 => { // IDLE -> RESUME
+                if let Err(e) = self.authority_tx.send(SovereignCommand::Resume) {
+                    tracing::error!("Failed to send RESUME command: {}", e);
+                }
+            }
+            1 => { // TIGHTEN -> CLOSE ALL
+                if let Err(e) = self.authority_tx.send(SovereignCommand::CloseAll) {
+                    tracing::error!("Failed to send CLOSE_ALL command: {}", e);
+                }
+            }
+            2 => { // FREEZE -> PAUSE
+                if let Err(e) = self.authority_tx.send(SovereignCommand::Pause) {
+                    tracing::error!("Failed to send PAUSE command: {}", e);
+                }
+            }
             3 => { 
                 // KILL SWITCH
                 tracing::error!("☢️ SYSTEM HALT COMMAND RECEIVED. INITIATING SHUTDOWN.");
+                // Also notify bridge if possible, but immediate exit takes precedence
+                let _ = self.authority_tx.send(SovereignCommand::Kill);
+
                 // We write to shared state so main loop can see it (if it checks)
                 // Or we just exit. For safety in Phase 5, let's force exit after a brief delay to allow Ack to send.
                 tokio::spawn(async move {
@@ -315,7 +332,24 @@ impl ReflexService for ReflexServerImpl {
 
         Ok(Response::new(Ack { success: true, message: "Ratchet Updated".into() }))
     }
-    async fn update_config(&self, _req: Request<ConfigPayload>) -> Result<Response<Ack>, Status> {
+    async fn update_config(&self, request: Request<ConfigPayload>) -> Result<Response<Ack>, Status> {
+        let req = request.into_inner();
+
+        if req.key == "sentiment_override" {
+            if req.value < 0.0 {
+                if let Err(e) = self.authority_tx.send(SovereignCommand::ClearSentimentOverride) {
+                    tracing::error!("Failed to send ClearSentimentOverride: {}", e);
+                    return Err(Status::internal("Bridge disconnected"));
+                }
+            } else {
+                if let Err(e) = self.authority_tx.send(SovereignCommand::SetSentimentOverride(req.value)) {
+                    tracing::error!("Failed to send SetSentimentOverride: {}", e);
+                    return Err(Status::internal("Bridge disconnected"));
+                }
+            }
+            return Ok(Response::new(Ack { success: true, message: "Sentiment Override Updated".into() }));
+        }
+
         Ok(Response::new(Ack { success: true, message: "Legacy stub".into() }))
     }
     type GetStreamStream = std::pin::Pin<Box<dyn tokio_stream::Stream<Item = Result<PhysicsResponse, Status>> + Send + Sync + 'static>>;
@@ -408,7 +442,8 @@ impl ReflexService for ReflexServerImpl {
 // --- Launcher ---
 pub async fn run_server(
     state: SafeState, 
-    tx: broadcast::Sender<SharedState>
+    tx: broadcast::Sender<SharedState>,
+    authority_tx: mpsc::UnboundedSender<SovereignCommand>,
 ) {
     // 1. gRPC Server
     let grpc_state = state.clone();
@@ -416,7 +451,8 @@ pub async fn run_server(
     let grpc_addr = "0.0.0.0:50051".parse().unwrap();
     let reflex_service = crate::reflex_proto::reflex_service_server::ReflexServiceServer::new(ReflexServerImpl { 
         state: grpc_state,
-        tx: grpc_tx 
+        tx: grpc_tx,
+        authority_tx,
     });
 
     tracing::info!("🚀 API Surface (gRPC) listening on {}", grpc_addr);
