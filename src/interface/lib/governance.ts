@@ -11,6 +11,7 @@ export enum SovereignCommand {
     CLOSE_ALL = 'CLOSE_ALL',
     SET_SENTIMENT_OVERRIDE = 'SET_SENTIMENT_OVERRIDE',
     CLEAR_SENTIMENT_OVERRIDE = 'CLEAR_SENTIMENT_OVERRIDE',
+    VERIFY = 'VERIFY',
 }
 
 export interface SovereignCommandRequest {
@@ -24,6 +25,28 @@ export interface SovereignCommandResponse {
     success: boolean;
     latency_ms?: number;
     error?: string;
+}
+
+const STORAGE_KEY = 'sovereign_master_key';
+
+/**
+ * Store the Sovereign Key in session storage
+ */
+export function setSovereignKey(key: string) {
+    if (typeof window !== 'undefined') {
+        sessionStorage.setItem(STORAGE_KEY, key);
+    }
+}
+
+/**
+ * Retrieve the Sovereign Key from storage or environment
+ */
+export function getSovereignKey(): string {
+    if (typeof window !== 'undefined') {
+        const stored = sessionStorage.getItem(STORAGE_KEY);
+        if (stored) return stored;
+    }
+    return process.env.NEXT_PUBLIC_SOVEREIGN_MASTER_KEY || '';
 }
 
 /**
@@ -67,7 +90,7 @@ export async function sendSovereignCommand(
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-Sovereign-Key': process.env.NEXT_PUBLIC_SOVEREIGN_MASTER_KEY || ''
+            'X-Sovereign-Key': getSovereignKey()
         },
         body: JSON.stringify(request),
     });
@@ -138,6 +161,7 @@ export function confirmCommand(command: SovereignCommand): boolean {
             'Override sentiment weight manually?',
         [SovereignCommand.CLEAR_SENTIMENT_OVERRIDE]:
             'Clear sentiment override?',
+        [SovereignCommand.VERIFY]: 'Verify Sovereign Key?',
     };
 
     return confirm(messages[command]);

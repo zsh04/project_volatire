@@ -2,7 +2,7 @@ use serde::{Serialize, Deserialize};
 use sha2::{Sha256, Digest};
 use tokio::sync::mpsc;
 use crate::feynman::PhysicsState;
-use crate::audit::QuestBridge;
+use crate::audit::{QuestBridge, ForensicLog};
 
 /// The immutable record of a decision event.
 /// Matches the schema required for "Combat Replay".
@@ -69,16 +69,67 @@ impl ForensicLogger {
 
         while let Some(packet) = self.rx.recv().await {
             // 1. Ingest into QuestDB (Hot Storage)
-            // We'll map this to a generic log structure or extend QuestBridge
-            // For now, we assume QuestBridge has a method or we add one.
-            // Since QuestBridge is strictly typed in current impl, we might need to extend it.
-            // For this pass, we will just log to INFO and TODO: impl persistent write
+            let forensic_log = ForensicLog {
+                timestamp: packet.timestamp,
+                trace_id: packet.trace_id.clone(),
+                physics: packet.physics,
+                sentiment: packet.sentiment,
+                vector_distance: packet.vector_distance,
+                quantile_score: packet.quantile_score,
+                decision: packet.decision.clone(),
+                operator_hash: packet.operator_hash.clone(),
+            };
+
+            self._auditor.log_forensic(forensic_log);
             
-            // In a real impl, this calls self.auditor.log_forensic(&packet);
             // We'll verify the flow by printing the Sovereign Hash
             if packet.quantile_score < 5 {
                 tracing::warn!("⚠️ Low Stability Decision Recorded: Hash={}", packet.operator_hash);
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn test_forensic_logging_flow() {
+        // 1. Setup Auditor (QuestBridge)
+        // Will fail to connect but should not panic
+        let auditor = QuestBridge::new("localhost:9009", "localhost", "admin", "quest", "qdb").await;
+
+        // 2. Setup Logger
+        let (tx, rx) = mpsc::channel(10);
+        let logger = ForensicLogger::new(rx, auditor.clone());
+
+        // 3. Spawn Logger
+        tokio::spawn(async move {
+            logger.run().await;
+        });
+
+        // 4. Send Packet
+        let mut packet = DecisionPacket {
+            timestamp: 1234567890.0,
+            trace_id: "test_trace".to_string(),
+            physics: PhysicsState::default(),
+            sentiment: 0.5,
+            vector_distance: 0.1,
+            quantile_score: 8,
+            decision: "Hold".to_string(),
+            operator_hash: String::new(),
+        };
+        packet.seal();
+
+        tx.send(packet).await.expect("Failed to send packet");
+
+        // 5. Wait briefly for processing (async fire & forget)
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // If we reached here without panic, success.
+        // We cannot easily assert internal state of QuestBridge without adding inspection methods,
+        // but this verifies the integration glue code.
     }
 }

@@ -4,7 +4,6 @@ import { useRef } from 'react';
 import { AuthGuard } from '@/components/AuthGuard'; // D-103
 import { AlphaRibbon } from '@/components/layout/AlphaRibbon';
 import { TacticalSidebar } from '@/components/hud/TacticalSidebar';
-import { SafetySidebar } from '@/components/layout/SafetySidebar';
 import { DepthVault } from '@/components/zones/DepthVault';
 import { RiemannWave } from '@/components/hud/RiemannWave';
 import { ReasoningStream } from '@/components/debate/ReasoningStream';
@@ -39,7 +38,7 @@ export default function Home() {
         {/* 2. Main Workspace (Sidebar + 3-Column Grid) */}
         <div className="flex-1 flex overflow-hidden mb-24"> {/* Margin Bottom for Command Deck */}
           {/* Left Rail: Safety Sidebar */}
-          <SafetySidebar />
+          <TacticalSidebar />
 
           {/* Triple Combat Grid */}
           <div className="flex-1 grid grid-cols-1 md:grid-cols-[300px_1fr_350px] gap-0.5 bg-white/5 p-0.5">

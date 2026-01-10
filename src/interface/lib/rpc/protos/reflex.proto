@@ -24,9 +24,6 @@ service ReflexService {
   // D-107: Turn Key (Update Legislation)
   rpc UpdateLegislation (LegislativeUpdate) returns (Ack);
 
-  // D-86: Sovereign Command Injection
-  rpc InjectSovereignCommand (SovereignCommandRequest) returns (Ack);
-
   // --- Legacy / Aux ---
   // Force a risk level change
   rpc TriggerRatchet (RatchetRequest) returns (Ack);
@@ -44,10 +41,6 @@ message TickHistoryRequest {
     double end_time = 3;   // Unix ms
 }
 
-message ClosePositionRequest {
-    string symbol = 1;
-}
-
 message PhysicsResponse {
     double price = 1;
     double velocity = 2;
@@ -56,42 +49,42 @@ message PhysicsResponse {
     double entropy = 5;
     double efficiency_index = 6;
     double timestamp = 7;
-    
+
     // Global Sequence ID (Directive-79)
     int64 sequence_id = 16;
-    
+
     // Account State
     double unrealized_pnl = 8;
     double equity = 9;
     double balance = 10;
     double realized_pnl = 23;
     double btc_position = 24;
-    
+
     // Model Telemetry
     double gemma_tokens_per_sec = 11;
     double gemma_latency_ms = 12; // 12
-    
+
     // Governance (Safety Staircase)
     int32 staircase_tier = 13; // 0=Q0, 1=Q1 ...
-    double staircase_progress = 14; 
-    
+    double staircase_progress = 14;
+
     // Audit Telemetry
     double audit_drift = 15;
-    
+
     // Directive-80: Vitality Sentinel metrics
     double system_latency_us = 17;
     double system_jitter_us = 18;
     string vitality_status = 19; // "OPTIMAL", "DEGRADED", "CRITICAL"
-    
+
     // Directive-81: Reasoning Trace (Cognitive Projection)
     repeated ReasoningStep reasoning_trace = 20;
 
     // D-83: Ignition Status
-    string ignition_status = 21; 
-    
+    string ignition_status = 21;
+
     // D-90: Recursive Risk Re-balancer Fidelity
     double system_sanity_score = 22;
-    
+
     // Directive-105: The Fiscal Control Deck
     repeated PositionState positions = 25;
     repeated OrderState orders = 26;
@@ -137,21 +130,6 @@ message VetoRequest {
     string operator = 2;
 }
 
-message SovereignCommandRequest {
-  enum CommandType {
-    UNKNOWN = 0;
-    KILL = 1;
-    VETO = 2;
-    PAUSE = 3;
-    RESUME = 4;
-    CLOSE_ALL = 5;
-    SET_SENTIMENT = 6;
-    CLEAR_SENTIMENT = 7;
-  }
-  CommandType type = 1;
-  double sentiment_value = 2; // Used if type == SET_SENTIMENT
-}
-
 message DemoteRequest {
     string reason = 1;
     string target_level = 2; // e.g., "Q1", "Floor"
@@ -171,14 +149,14 @@ message RatchetRequest {
 message LegislativeUpdate {
   // Strategic Bias (The Director)
   string bias = 1; // "NEUTRAL", "LONG_ONLY", "SHORT_ONLY"
-  
+
   // Risk Scaling
   double aggression = 2; // 0.0 - 2.0 (Fidelity Multiplier)
-  
+
   // Tactical Overrides
   bool maker_only = 3;
   bool hibernation = 4; // READ_ONLY mode
-  
+
   // Command
   bool snap_to_breakeven = 5;
 }
