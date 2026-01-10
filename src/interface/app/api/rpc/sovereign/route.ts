@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { SovereignCommandRequest, SovereignCommandResponse } from '@/lib/governance';
 import { getReflexClient } from '@/lib/rpc/client';
+import { secureCompare } from '@/lib/crypto';
 import * as grpc from '@grpc/grpc-js';
 import { cookies } from 'next/headers';
 
@@ -34,7 +35,7 @@ export async function POST(request: Request): Promise<NextResponse<SovereignComm
             const validKey = process.env.NEXT_PUBLIC_SOVEREIGN_MASTER_KEY;
 
             // If bypass is OFF, we MUST have a valid Sovereign Key
-            if (!sovereignKey || sovereignKey !== validKey) {
+            if (!sovereignKey || !validKey || !secureCompare(sovereignKey, validKey)) {
                 return NextResponse.json(
                     { success: false, error: 'Invalid or missing Sovereign Key' },
                     { status: 401 }

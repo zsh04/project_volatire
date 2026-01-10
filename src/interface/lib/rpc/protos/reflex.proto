@@ -24,6 +24,12 @@ service ReflexService {
   // D-107: Turn Key (Update Legislation)
   rpc UpdateLegislation (LegislativeUpdate) returns (Ack);
 
+  // D-109: Cancel Order
+  rpc CancelOrder (CancelOrderRequest) returns (Ack);
+
+  // D-109: Close Position
+  rpc ClosePosition (ClosePositionRequest) returns (Ack);
+
   // --- Legacy / Aux ---
   // Force a risk level change
   rpc TriggerRatchet (RatchetRequest) returns (Ack);
@@ -159,6 +165,14 @@ message LegislativeUpdate {
 
   // Command
   bool snap_to_breakeven = 5;
+}
+
+message CancelOrderRequest {
+    string order_id = 1;
+}
+
+message ClosePositionRequest {
+    string symbol = 1;
 }
 
 message ConfigPayload {
