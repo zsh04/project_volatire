@@ -28,6 +28,7 @@ export interface SovereignCommandResponse {
 }
 
 const STORAGE_KEY = 'sovereign_master_key';
+const USER_ID_COOKIE = 'sovereign_user_id';
 
 /**
  * Store the Sovereign Key in session storage
@@ -48,6 +49,37 @@ export function getSovereignKey(): string {
     }
     return process.env.NEXT_PUBLIC_SOVEREIGN_MASTER_KEY || '';
 }
+
+/**
+ * Set the User ID in a cookie (simple session mechanism)
+ */
+export function setUserId(userId: string) {
+    if (typeof window !== 'undefined') {
+        // Set cookie for 7 days
+        const days = 7;
+        const date = new Date();
+        date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+        const expires = "; expires=" + date.toUTCString();
+        document.cookie = USER_ID_COOKIE + "=" + (userId || "") + expires + "; path=/; SameSite=Strict";
+    }
+}
+
+/**
+ * Get the User ID from cookie
+ */
+export function getUserId(): string {
+    if (typeof window !== 'undefined') {
+        const nameEQ = USER_ID_COOKIE + "=";
+        const ca = document.cookie.split(';');
+        for(let i=0;i < ca.length;i++) {
+            let c = ca[i];
+            while (c.charAt(0)==' ') c = c.substring(1,c.length);
+            if (c.indexOf(nameEQ) == 0) return c.substring(nameEQ.length,c.length);
+        }
+    }
+    return 'pilot'; // Default fallback
+}
+
 
 /**
  * Send a sovereign command to the Reflex backend
@@ -90,7 +122,8 @@ export async function sendSovereignCommand(
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
-            'X-Sovereign-Key': getSovereignKey()
+            'X-Sovereign-Key': getSovereignKey(),
+            'X-User-ID': getUserId()
         },
         body: JSON.stringify(request),
     });
