@@ -233,6 +233,9 @@ class BrainService(brain_pb2_grpc.BrainServiceServicer):
 
         duration_ns = int((datetime.now() - start).total_seconds() * 1e9)
 
+        # Metrics Log for Audit extraction
+        print(f"[METRICS] gemma_latency_ms={duration_ns / 1e6:.4f}", flush=True)
+
         console.print(
             f"[bold yellow]🧠 CONTEXT:[/bold yellow] "
             f"Regime: [cyan]{ctx_data['nearest_regime']}[/cyan] | "

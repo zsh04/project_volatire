@@ -74,8 +74,9 @@ start_brain() {
     
     cd "$PROJECT_ROOT/src/brain"
     
-    # Start uvicorn server
-    poetry run uvicorn src.main:app --host 0.0.0.0 --port "${BRAIN_SERVICE_PORT}" &
+    # Start uvicorn server, redirecting output to log file
+    mkdir -p "$OUTPUT_DIR"
+    poetry run uvicorn src.main:app --host 0.0.0.0 --port "${BRAIN_SERVICE_PORT}" > "$OUTPUT_DIR/brain.log" 2>&1 &
     BRAIN_PID=$!
     
     # Wait for brain to be ready
@@ -142,6 +143,50 @@ measure_audit_accuracy() {
     echo "97.5"  # Mock percentage
 }
 
+# Measure Gemma Latency (p99)
+measure_gemma_latency() {
+    local log_file="$OUTPUT_DIR/brain.log"
+
+    # Send log to stderr to avoid corrupting captured output
+    log_info "Measuring Gemma Latency (p99)..." >&2
+
+    if [ ! -f "$log_file" ]; then
+        echo "0"
+        return
+    fi
+
+    # Parse logs for [METRICS] gemma_latency_ms=..., extract values, compute p99
+    # Python is available since we run poetry/reflex
+    python3 -c "
+import re
+import statistics
+import sys
+
+latency_values = []
+try:
+    with open('$log_file', 'r') as f:
+        for line in f:
+            match = re.search(r'\[METRICS\] gemma_latency_ms=([\d\.]+)', line)
+            if match:
+                try:
+                    latency_values.append(float(match.group(1)))
+                except ValueError:
+                    pass
+
+    if not latency_values:
+        print('0')
+    else:
+        # Sort and take 99th percentile
+        latency_values.sort()
+        idx = int(len(latency_values) * 0.99)
+        # Handle index out of bound for small samples (shouldn't happen with math above but for safety)
+        idx = min(idx, len(latency_values) - 1)
+        print(f'{latency_values[idx]:.4f}')
+except Exception as e:
+    print('0')
+"
+}
+
 # Cleanup
 cleanup() {
     log_info "Cleaning up processes..."
@@ -196,6 +241,7 @@ main() {
     # Check results
     local lag_warning_count=$(monitor_cognitive_lag)
     local audit_accuracy=$(measure_audit_accuracy)
+    local gemma_latency=$(measure_gemma_latency)
     
     # Evaluate results
     log_info "==========================================="
@@ -203,6 +249,7 @@ main() {
     log_info "  Out-of-Order Events: ${out_of_order_count}"
     log_info "  Cognitive Lag Warnings: ${lag_warning_count}"
     log_info "  Gemma Audit Accuracy: ${audit_accuracy}%"
+    log_info "  Gemma Latency (p99): ${gemma_latency}ms"
     log_info "==========================================="
     
     # Check acceptance criteria
@@ -234,6 +281,7 @@ main() {
     "out_of_order_events": $out_of_order_count,
     "cognitive_lag_warnings": $lag_warning_count,
     "gemma_audit_accuracy_pct": $audit_accuracy,
+    "gemma_latency_ms": $gemma_latency,
     "brain_delay_ms": $BRAIN_DELAY_MS,
     "thresholds": {
         "gsid_ordering": "100%",
