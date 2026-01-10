@@ -63,3 +63,13 @@ class BrainServicer(brain_pb2_grpc.BrainServiceServicer):
         """
         logger.info("regime_change_detected", regime=request.regime, vol=request.volatility)
         return brain_pb2.Empty()
+
+    async def ResetState(
+        self, request: brain_pb2.Empty, context: grpc.aio.ServicerContext
+    ) -> brain_pb2.Ack:
+        """
+        Reflex triggers a hard reset of the Brain's internal state (AMR).
+        """
+        logger.warning("⚡ BRAIN RESET REQUESTED (AMR)")
+        # In a real implementation, we would flush KV cache / memory here.
+        return brain_pb2.Ack(success=True, message="Brain State Reset")

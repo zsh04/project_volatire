@@ -214,7 +214,11 @@ impl OODACore {
                             let triggered_amr = self.nullifier.nullify(e, ctx.reasoning.clone());
                             if triggered_amr {
                                 tracing::warn!("⚡ AMR: BRAIN RESET REQUESTED");
-                                // TODO: Actually trigger reset callback or signal if needed here
+                                if let Err(e) = c.reset_state().await {
+                                    tracing::error!("❌ Failed to send AMR Reset Signal: {}", e);
+                                } else {
+                                    tracing::info!("✅ AMR Reset Signal Sent to Brain.");
+                                }
                             }
                             
                             // Return BLIND STATE (Nullified)

@@ -239,6 +239,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
         s
     }));
+
+    // D-86: Authority Bridge (Sovereign Command Channel)
+    // Moved up to be available for API Server
+    let (mut authority_bridge, authority_tx) = reflex::governor::authority::AuthorityBridge::new();
     
     // --- Directive-50: Internal Historian (Forensic Logger) ---
     let (forensic_tx, forensic_rx) = tokio::sync::mpsc::channel(1024);
@@ -379,10 +383,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // D-83: Ignition Sequence (Capital Gate)
     let mut ignition = reflex::governor::ignition::IgnitionSequence::new();
 
-    // D-86: Authority Bridge (Sovereign Command Channel)
-    let (mut authority_bridge, authority_tx) = reflex::governor::authority::AuthorityBridge::new();
-    // TODO: Pass authority_tx to gRPC server for command injection
-
     // D-90: Rebalancer (The Governor)
     let mut rebalancer = reflex::governor::rebalancer::Rebalancer::new(50000.0); // Match Ledger
 
@@ -500,7 +500,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                  Ok(Some(tick)) => {
                      now_ms = tick.timestamp as f64;
                      market.update_book(tick.bid, tick.ask);
-                     tick.price
+                     (tick.price, 0.0)
                  },
                  Ok(None) => {
                      error!("❌ Ingestion Channel Closed!");
