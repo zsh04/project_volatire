@@ -1,7 +1,58 @@
-import React, { useMemo } from 'react';
-import { useSystemStore } from '@/lib/stores/system-store';
+import React, { useMemo, useCallback } from 'react';
+import { useSystemStore, Position } from '@/lib/stores/system-store';
 import { formatDistanceToNow } from 'date-fns';
 import { closePosition } from '@/lib/grpc/reflex-client';
+
+interface PositionRowProps {
+    position: Position;
+    onFlatten: (symbol: string) => void;
+    onReplay: (timestamp: number) => void;
+}
+
+const PositionRow = React.memo(({ position: p, onFlatten, onReplay }: PositionRowProps) => {
+    const isProfit = p.unrealizedPnl >= 0;
+    const pnlColor = isProfit ? 'text-emerald-400' : 'text-rose-500';
+    const rowGlow = isProfit ? 'hover:bg-emerald-500/5' : 'hover:bg-rose-500/5 animate-pulse-slow';
+
+    return (
+        <div className={`grid grid-cols-7 px-4 py-2 border-b border-white/5 transition-colors cursor-pointer group ${rowGlow}`}>
+            <div className="col-span-1 font-bold text-white">{p.symbol}</div>
+            <div className="text-right text-white/80">{p.netSize?.toFixed(4)}</div>
+            <div className="text-right text-white/60">{p.avgEntryPrice?.toFixed(2)}</div>
+            <div className="text-right font-mono text-white/60">
+                {p.currentPrice?.toFixed(2) || '--'}
+            </div>
+            <div className={`text-right font-bold ${pnlColor}`}>
+                {isProfit ? '+' : ''}{p.unrealizedPnl?.toFixed(2)}
+            </div>
+            <div className="text-right text-white/40 text-[10px] pt-0.5">
+                {formatDistanceToNow(p.entryTimestamp, { addSuffix: false })}
+            </div>
+            <div className="text-center flex justify-center">
+                <button
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        onReplay(p.entryTimestamp);
+                    }}
+                    className="opacity-0 group-hover:opacity-100 mr-2 p-1 hover:bg-amber-500/20 rounded transition-all"
+                    title="Replay Execution"
+                >
+                    <svg className="w-3 h-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </button>
+                <button
+                    onClick={(e) => { e.stopPropagation(); onFlatten(p.symbol); }}
+                    className="opacity-0 group-hover:opacity-100 px-2 py-0.5 bg-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white text-[9px] uppercase tracking-wider rounded transition-all"
+                >
+                    FLATTEN
+                </button>
+            </div>
+        </div>
+    );
+});
+
+PositionRow.displayName = 'PositionRow';
 
 /**
  * Directive-105: Position Blotter (The Ledger)
@@ -16,14 +67,18 @@ export function PositionBlotter() {
         return positions.reduce((acc, p) => acc + (Math.abs(p.netSize) * p.avgEntryPrice), 0);
     }, [positions]);
 
-    const handleFlatten = async (symbol: string) => {
+    const handleFlatten = useCallback(async (symbol: string) => {
         console.log(`[TACTICAL] FLATTEN REQUEST: ${symbol}`);
         try {
             await closePosition(symbol);
         } catch (err) {
             console.error('[TACTICAL] FLATTEN FAILED:', err);
         }
-    };
+    }, []);
+
+    const handleReplay = useCallback((timestamp: number) => {
+        useSystemStore.getState().setReplay({ isReplaying: true, startTime: timestamp, endTime: Date.now() });
+    }, []);
 
     return (
         <div className="h-full flex flex-col bg-[#0D1117] text-xs font-mono relative overflow-hidden">
@@ -56,48 +111,14 @@ export function PositionBlotter() {
                         NO ACTIVE EXPOSURE
                     </div>
                 ) : (
-                    positions.map((p) => {
-                        const isProfit = p.unrealizedPnl >= 0;
-                        const pnlColor = isProfit ? 'text-emerald-400' : 'text-rose-500';
-                        const rowGlow = isProfit ? 'hover:bg-emerald-500/5' : 'hover:bg-rose-500/5 animate-pulse-slow';
-
-                        return (
-                            <div key={p.symbol} className={`grid grid-cols-7 px-4 py-2 border-b border-white/5 transition-colors cursor-pointer group ${rowGlow}`}>
-                                <div className="col-span-1 font-bold text-white">{p.symbol}</div>
-                                <div className="text-right text-white/80">{p.netSize?.toFixed(4)}</div>
-                                <div className="text-right text-white/60">{p.avgEntryPrice?.toFixed(2)}</div>
-                                <div className="text-right font-mono text-white/60">
-                                    {p.currentPrice?.toFixed(2) || '--'}
-                                </div>
-                                <div className={`text-right font-bold ${pnlColor}`}>
-                                    {isProfit ? '+' : ''}{p.unrealizedPnl?.toFixed(2)}
-                                </div>
-                                <div className="text-right text-white/40 text-[10px] pt-0.5">
-                                    {formatDistanceToNow(p.entryTimestamp, { addSuffix: false })}
-                                </div>
-                                <div className="text-center flex justify-center">
-                                    <button
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            useSystemStore.getState().setReplay({ isReplaying: true, startTime: p.entryTimestamp, endTime: Date.now() });
-                                        }}
-                                        className="opacity-0 group-hover:opacity-100 mr-2 p-1 hover:bg-amber-500/20 rounded transition-all"
-                                        title="Replay Execution"
-                                    >
-                                        <svg className="w-3 h-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                    </button>
-                                    <button
-                                        onClick={(e) => { e.stopPropagation(); handleFlatten(p.symbol); }}
-                                        className="opacity-0 group-hover:opacity-100 px-2 py-0.5 bg-rose-500/20 text-rose-400 hover:bg-rose-500 hover:text-white text-[9px] uppercase tracking-wider rounded transition-all"
-                                    >
-                                        FLATTEN
-                                    </button>
-                                </div>
-                            </div>
-                        );
-                    })
+                    positions.map((p) => (
+                        <PositionRow
+                            key={p.symbol}
+                            position={p}
+                            onFlatten={handleFlatten}
+                            onReplay={handleReplay}
+                        />
+                    ))
                 )}
             </div>
 
