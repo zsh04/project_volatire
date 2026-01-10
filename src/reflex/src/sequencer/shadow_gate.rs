@@ -23,13 +23,15 @@ pub enum ShadowStatus {
 }
 
 pub struct ShadowGate {
+    pub symbol: String,
     pub virtual_book: HashMap<String, ShadowOrder>,
     pub latency_simulation_ms: u64,
 }
 
 impl ShadowGate {
-    pub fn new() -> Self {
+    pub fn new(symbol: String) -> Self {
         Self {
+            symbol,
             virtual_book: HashMap::new(),
             latency_simulation_ms: 500, // D-54: Exchange Latency Sim
         }
@@ -52,7 +54,7 @@ impl ShadowGate {
         // In reality, they might be Market orders, but we track slippage against this price.
         let order = ShadowOrder {
             id: id.clone(),
-            symbol: "BTC-USDT".to_string(), // TODO: Parameterize
+            symbol: self.symbol.clone(),
             side: side.to_string(),
             qty,
             limit_price,
@@ -116,7 +118,7 @@ mod tests {
 
     #[test]
     fn test_shadow_fill_mechanics() {
-        let mut gate = ShadowGate::new();
+        let mut gate = ShadowGate::new("BTC-USDT".to_string());
         // Lower latency for test speed
         gate.latency_simulation_ms = 10;
         

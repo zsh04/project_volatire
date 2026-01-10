@@ -1,4 +1,5 @@
 use reflex::governor::ooda_loop::{OODACore, PhysicsState, OODAState};
+use reflex::governor::legislator::LegislativeState;
 use reflex::telemetry;
 use std::time::Duration;
 use tracing::info;
@@ -26,8 +27,8 @@ async fn test_telemetry_emission() {
 
     // 4. Run Cycle (Should generate spans)
     info!("TEST: Running OODA Cycle...");
-    let state = ooda.orient(physics, 0, None, "Neutral".to_string()).await; // Negative sentiment simulated by None fallback
-    let _decision = ooda.decide(&state, &Default::default());
+    let state = ooda.orient(physics, 0, None, "NEUTRAL".to_string()).await; // Negative sentiment simulated by None fallback
+    let _decision = ooda.decide(&state, &LegislativeState::default());
     
     // 5. Wait for batch flush (Batch processor default 1s or size)
     info!("TEST: Waiting for export...");
