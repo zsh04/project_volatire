@@ -3,7 +3,8 @@
 import { useRef } from 'react';
 import { AuthGuard } from '@/components/AuthGuard'; // D-103
 import { AlphaRibbon } from '@/components/layout/AlphaRibbon';
-import { TacticalSidebar } from '@/components/HUD/TacticalSidebar';
+import { TacticalSidebar } from '@/components/hud/TacticalSidebar';
+import { SafetySidebar } from '@/components/layout/SafetySidebar';
 import { DepthVault } from '@/components/zones/DepthVault';
 import { RiemannWave } from '@/components/hud/RiemannWave';
 import { ReasoningStream } from '@/components/debate/ReasoningStream';

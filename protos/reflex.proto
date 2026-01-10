@@ -24,6 +24,9 @@ service ReflexService {
   // D-107: Turn Key (Update Legislation)
   rpc UpdateLegislation (LegislativeUpdate) returns (Ack);
 
+  // D-106: Flatten Position
+  rpc ClosePosition (ClosePositionRequest) returns (Ack);
+
   // --- Legacy / Aux ---
   // Force a risk level change
   rpc TriggerRatchet (RatchetRequest) returns (Ack);
@@ -39,6 +42,10 @@ message TickHistoryRequest {
     string symbol = 1;
     double start_time = 2; // Unix ms
     double end_time = 3;   // Unix ms
+}
+
+message ClosePositionRequest {
+    string symbol = 1;
 }
 
 message PhysicsResponse {
