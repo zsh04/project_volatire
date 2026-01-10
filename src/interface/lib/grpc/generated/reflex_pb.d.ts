@@ -338,6 +338,28 @@ export namespace VetoRequest {
   }
 }
 
+export class CancelOrderRequest extends jspb.Message {
+  getOrderId(): string;
+  setOrderId(value: string): CancelOrderRequest;
+
+  getSymbol(): string;
+  setSymbol(value: string): CancelOrderRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): CancelOrderRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: CancelOrderRequest): CancelOrderRequest.AsObject;
+  static serializeBinaryToWriter(message: CancelOrderRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): CancelOrderRequest;
+  static deserializeBinaryFromReader(message: CancelOrderRequest, reader: jspb.BinaryReader): CancelOrderRequest;
+}
+
+export namespace CancelOrderRequest {
+  export type AsObject = {
+    orderId: string,
+    symbol: string,
+  }
+}
+
 export class DemoteRequest extends jspb.Message {
   getReason(): string;
   setReason(value: string): DemoteRequest;

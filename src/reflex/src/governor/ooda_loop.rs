@@ -466,12 +466,13 @@ impl OODACore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::governor::legislator::LegislativeState; // Helper for mocks
 
     #[tokio::test]
     async fn test_veto_logic() {
         let mut core = OODACore::new(None, None, None);
+        let legislation = LegislativeState::default();
         
-        // Case: Bullish Physics
         // Case: Bullish Physics
         let physics = PhysicsState {
             price: 50000.0,
@@ -482,10 +483,10 @@ mod tests {
         };
 
         // Standard Orient (Simulated)
-        let state = core.orient(physics, 0, None).await;
+        let state = core.orient(physics, 0, None, "NEUTRAL".to_string()).await;
         
         // Decide
-        let decision = core.decide(&state);
+        let decision = core.decide(&state, &legislation);
         
         // EXPECTATION: HOLD/VETO because Sentiment is Negative (-0.8)
         match decision.action {
@@ -497,6 +498,8 @@ mod tests {
     #[tokio::test]
     async fn test_jitter_fallback_logic() {
         let mut core = OODACore::new(None, None, None);
+        let legislation = LegislativeState::default();
+
         let physics = PhysicsState {
             price: 50000.0,
             velocity: 10.0,
@@ -512,9 +515,10 @@ mod tests {
             nearest_regime: None,
             oriented_at: Instant::now(),
             trace_id: "test_trace".to_string(),
+            brain_latency: None,
         };
 
-        let decision = core.decide(&blind_state);
+        let decision = core.decide(&blind_state, &legislation);
         
         // Expectation: Buy, but with Reduced Size/Confidence (0.5 multiplier)
         if let Action::Buy(pct) = decision.action {
@@ -530,6 +534,8 @@ mod tests {
     #[tokio::test]
     async fn test_cycle_latency() {
         let mut core = OODACore::new(None, None, None);
+        let legislation = LegislativeState::default();
+
         let physics = PhysicsState {
             price: 50000.0,
             velocity: 0.0,
@@ -541,8 +547,8 @@ mod tests {
         let start = Instant::now();
         for _ in 0..10_000 {
             // Using logic internal simulation for speed test
-            let state = core.orient(physics.clone(), 0, None).await;
-            let dec = core.decide(&state);
+            let state = core.orient(physics.clone(), 0, None, "NEUTRAL".to_string()).await;
+            let dec = core.decide(&state, &legislation);
             core.act(dec, physics.price);
         }
         let total = start.elapsed();

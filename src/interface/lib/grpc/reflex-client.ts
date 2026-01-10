@@ -1,5 +1,5 @@
 import { ReflexServiceClient } from './generated/ReflexServiceClientPb';
-import { Empty, PhysicsResponse, OODAResponse, VetoRequest, LegislativeUpdate } from './generated/reflex_pb';
+import { Empty, PhysicsResponse, OODAResponse, VetoRequest, LegislativeUpdate, CancelOrderRequest } from './generated/reflex_pb';
 import { useMarketStore } from '../stores/market-store';
 import { useAgentStore } from '../stores/agent-store';
 import { useSystemStore } from '../stores/system-store';
@@ -170,6 +170,26 @@ export async function triggerVeto(reason: string, operator: string): Promise<boo
 
             // Update agent store
             useAgentStore.getState().activateVeto(reason);
+            resolve(true);
+        });
+    });
+}
+
+// D-109: Cancel Order
+export async function cancelOrder(orderId: string): Promise<boolean> {
+    const client = getReflexClient();
+
+    return new Promise((resolve, reject) => {
+        const request = new CancelOrderRequest();
+        request.setOrderId(orderId);
+
+        client.cancelOrder(request, {}, (err, response) => {
+            if (err) {
+                console.error('Cancel order failed:', err);
+                reject(err);
+                return;
+            }
+            console.log('Cancel Confirmed:', response.getMessage());
             resolve(true);
         });
     });

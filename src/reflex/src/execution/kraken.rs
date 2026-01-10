@@ -7,8 +7,10 @@ use tracing::{info, error};
 
 type HmacSha512 = Hmac<Sha512>;
 
+#[derive(Debug)]
 pub struct KrakenClient {
     api_key: String,
+    #[allow(dead_code)]
     private_key: Vec<u8>,
     base_url: String,
 }
@@ -96,6 +98,63 @@ impl KrakenClient {
         if status.is_success() {
             if let Some(result) = body.get("result") {
                 info!("✅ Kraken Order Validation: {}", serde_json::to_string_pretty(&result)?);
+                Ok(serde_json::to_string(&result)?)
+            } else if let Some(error) = body.get("error") {
+                error!("❌ Kraken API Error: {}", error);
+                Err(format!("Kraken error: {}", error).into())
+            } else {
+                Ok(body.to_string())
+            }
+        } else {
+            error!("❌ Kraken HTTP Error {}: {}", status, body);
+            Err(format!("HTTP {}: {}", status, body).into())
+        }
+    }
+
+    /// Cancel an order on Kraken
+    /// txid: The transaction ID (order ID) to cancel
+    pub async fn cancel_order(
+        &self,
+        txid: &str,
+    ) -> Result<String, Box<dyn std::error::Error>> {
+        let mut params = std::collections::HashMap::new();
+        params.insert("txid", txid.to_string());
+
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)?
+            .as_millis()
+            .to_string();
+        params.insert("nonce", nonce.clone());
+
+        let mut post_data = params.iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>();
+        post_data.sort();
+        let post_data_str = post_data.join("&");
+
+        let path = "/0/private/CancelOrder";
+        let signature = self.sign(path, &nonce, &post_data_str)?;
+
+        let url = format!("{}{}", self.base_url, path);
+        let client = reqwest::Client::new();
+
+        info!("🗑️ Kraken: Cancelling order {}", txid);
+
+        let response: reqwest::Response = client
+            .post(&url)
+            .header("API-Key", &self.api_key)
+            .header("API-Sign", signature)
+            .header("Content-Type", "application/x-www-form-urlencoded")
+            .body(post_data_str)
+            .send()
+            .await?;
+
+        let status = response.status();
+        let body: Value = response.json().await?;
+
+        if status.is_success() {
+            if let Some(result) = body.get("result") {
+                info!("✅ Kraken Order Cancelled: {}", serde_json::to_string_pretty(&result)?);
                 Ok(serde_json::to_string(&result)?)
             } else if let Some(error) = body.get("error") {
                 error!("❌ Kraken API Error: {}", error);
