@@ -22,6 +22,19 @@ pub struct FrictionLog {
 }
 
 #[derive(Debug, Clone)]
+pub struct TickLog {
+    pub symbol: String,
+    pub price: f64,
+    pub quantity: f64,
+    pub ts: i64,
+}
+
+pub enum AuditLog {
+    Friction(FrictionLog),
+    Tick(TickLog),
+}
+
+#[derive(Debug, Clone)]
 pub struct ForensicLog {
     pub timestamp: f64,
     pub trace_id: String,
@@ -35,7 +48,7 @@ pub struct ForensicLog {
 
 #[derive(Clone)]
 pub struct QuestBridge {
-    ilp_sender: mpsc::Sender<FrictionLog>,
+    ilp_sender: mpsc::Sender<AuditLog>,
     forensic_sender: mpsc::Sender<ForensicLog>,
     sql_pool: Pool,
 }
@@ -43,7 +56,7 @@ pub struct QuestBridge {
 impl QuestBridge {
     pub async fn new(ilp_host: &str, sql_host: &str, user: &str, pass: &str, db: &str) -> Self {
         // 1. ILP Channel Setup
-        let (tx, mut rx) = mpsc::channel::<FrictionLog>(4096);
+        let (tx, mut rx) = mpsc::channel::<AuditLog>(4096);
         let (tx_forensic, mut rx_forensic) = mpsc::channel::<ForensicLog>(4096);
         let ilp_host_owned = ilp_host.to_string();
         let ilp_host_forensic = ilp_host.to_string();
@@ -204,6 +217,16 @@ impl QuestBridge {
         tokio::spawn(async move {
             if let Err(e) = sender.send(AuditLog::Tick(log)).await {
                 error!("Failed to queue tick log: {}", e);
+            }
+        });
+    }
+
+    /// Fire-and-forget logging of Forensics.
+    pub fn log_forensic(&self, log: ForensicLog) {
+        let sender = self.forensic_sender.clone();
+        tokio::spawn(async move {
+            if let Err(e) = sender.send(log).await {
+                error!("Failed to queue forensic log: {}", e);
             }
         });
     }
