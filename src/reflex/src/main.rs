@@ -267,7 +267,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Update OODA Core with Decay Channel
-    let mut ooda = reflex::governor::ooda_loop::OODACore::new(Some(forensic_tx), Some(mirror_tx), Some(decay_tx));
+    let mut ooda = reflex::governor::ooda_loop::OODACore::new("BTC-USDT".to_string(), Some(forensic_tx), Some(mirror_tx), Some(decay_tx));
 
     // D-86: Authority Bridge (Sovereign Command Channel)
     let (mut authority_bridge, authority_tx) = reflex::governor::authority::AuthorityBridge::new();
@@ -379,6 +379,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // D-83: Ignition Sequence (Capital Gate)
     let mut ignition = reflex::governor::ignition::IgnitionSequence::new();
 
+    // D-86: Authority Bridge (Sovereign Command Channel)
+    let (mut authority_bridge, authority_tx) = reflex::governor::authority::AuthorityBridge::new();
+    // TODO: Pass authority_tx to gRPC server for command injection
 
     // D-90: Rebalancer (The Governor)
     let mut rebalancer = reflex::governor::rebalancer::Rebalancer::new(50000.0); // Match Ledger
@@ -455,15 +458,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
         }
         
-        // D-86: Tactical Pause - Continue monitoring but block trading
-        if authority_bridge.is_paused() {
-            tracing::debug!("⏸️ Tactical Pause active - updating HUD only");
-            // TODO: Update physics & Gemma but skip Gateway
-            // For now, sleep and continue
-            tokio::time::sleep(Duration::from_millis(19)).await;
-            continue;
-        }
-        
         // D-83: Check for Ignition Request from API
         if let Ok(mut w) = shared_state.write() {
             if w.ignition_request {
@@ -493,16 +487,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _enter = span.enter();
 
         // --- Directive-72: LIVE DATA ORIGIN ---
-        let price = if is_sim_mode_flag {
+        let (price, volume) = if is_sim_mode_flag {
              let phase = (now_ms / 1000.0) * std::f64::consts::PI; 
              let signal = phase.sin() * 5.0;
              let noise = (rand::random::<f64>() - 0.5) * 2.0;
              let spike = if now_ms > 5000.0 && now_ms < 5500.0 { 10.0 } else { 0.0 };
-             100.0 + signal + noise + spike
+             let p = 100.0 + signal + noise + spike;
+             let v = rand::thread_rng().gen_range(0.1..5.0);
+             (p, v)
         } else {
              match tokio::time::timeout(Duration::from_millis(100), ingest_rx.recv()).await {
                  Ok(Some(tick)) => {
                      now_ms = tick.timestamp as f64;
+                     market.update_book(tick.bid, tick.ask);
                      tick.price
                  },
                  Ok(None) => {
@@ -511,7 +508,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                  },
                  Err(_) => {
                      now_ms += 100.0;
-                     market.price 
+                     (market.price, 0.0)
                  }
              }
         };
@@ -527,13 +524,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             reflex::historian::events::MarketTickEvent {
                 timestamp: now_ms as u64,
                 price: price,
-                volume: 0.0, // TODO: Ingest volume
+                volume: volume,
             }
         ));
 
         // D-79: Generate GSID
         let seq_id = sequencer.next();
-        let state = feynman.update(market.price, now_ms, seq_id);
+        let spread = market.get_spread();
+        let state = feynman.update(market.price, now_ms, seq_id, spread);
         metrics.market_velocity.record(state.velocity, &kv);
         
         reflex::historian::logger::record_event(reflex::historian::events::LogEvent::Signal(
@@ -596,7 +594,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         };
 
         // 4. ACT (Execution)
-        ooda.act(decision.clone(), price);
+        // D-86: Tactical Pause - Skip Gateway if paused
+        if !authority_bridge.is_paused() {
+            ooda.act(decision.clone(), price);
+        } else {
+             tracing::debug!("⏸️ Tactical Pause - Skipping Gateway Execution");
+        }
 
         // Update Shared State (For API)
         if let Ok(mut w) = shared_state.write() {
