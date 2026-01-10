@@ -28,6 +28,24 @@ export namespace TickHistoryRequest {
   }
 }
 
+export class ClosePositionRequest extends jspb.Message {
+  getSymbol(): string;
+  setSymbol(value: string): ClosePositionRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): ClosePositionRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: ClosePositionRequest): ClosePositionRequest.AsObject;
+  static serializeBinaryToWriter(message: ClosePositionRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): ClosePositionRequest;
+  static deserializeBinaryFromReader(message: ClosePositionRequest, reader: jspb.BinaryReader): ClosePositionRequest;
+}
+
+export namespace ClosePositionRequest {
+  export type AsObject = {
+    symbol: string,
+  }
+}
+
 export class PhysicsResponse extends jspb.Message {
   getPrice(): number;
   setPrice(value: number): PhysicsResponse;

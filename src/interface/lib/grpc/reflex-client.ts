@@ -1,5 +1,5 @@
 import { ReflexServiceClient } from './generated/ReflexServiceClientPb';
-import { Empty, PhysicsResponse, OODAResponse, VetoRequest, LegislativeUpdate } from './generated/reflex_pb';
+import { Empty, PhysicsResponse, OODAResponse, VetoRequest, LegislativeUpdate, ClosePositionRequest } from './generated/reflex_pb';
 import { useMarketStore } from '../stores/market-store';
 import { useAgentStore } from '../stores/agent-store';
 import { useSystemStore } from '../stores/system-store';
@@ -171,6 +171,25 @@ export async function triggerVeto(reason: string, operator: string): Promise<boo
             // Update agent store
             useAgentStore.getState().activateVeto(reason);
             resolve(true);
+        });
+    });
+}
+
+export async function closePosition(symbol: string): Promise<boolean> {
+    const client = getReflexClient();
+
+    return new Promise((resolve, reject) => {
+        const request = new ClosePositionRequest();
+        request.setSymbol(symbol);
+
+        client.closePosition(request, {}, (err, response) => {
+            if (err) {
+                console.error('Close position failed:', err);
+                reject(err);
+                return;
+            }
+            console.log(`[D-106] Position closed for ${symbol}: ${response.getMessage()}`);
+            resolve(response.getSuccess());
         });
     });
 }

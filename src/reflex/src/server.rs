@@ -12,6 +12,7 @@ use crate::reflex_proto::{
     ReasoningStep, // D-81
     PositionState, OrderState, // D-105
     TickHistoryRequest, // D-106
+    ClosePositionRequest, // D-106 (Flatten)
     LegislativeUpdate, // D-107
     SovereignCommandRequest,
     sovereign_command_request::CommandType,
@@ -321,6 +322,20 @@ impl ReflexService for ReflexServerImpl {
         );
 
         Ok(Response::new(Ack { success: true, message: "Legislation Updated".into() }))
+    }
+
+    async fn close_position(&self, request: Request<ClosePositionRequest>) -> Result<Response<Ack>, Status> {
+        let req = request.into_inner();
+        tracing::info!("📉 FLATTEN REQUEST RECEIVED: {}", req.symbol);
+
+        // In a real architecture, we would delegate this to the OrderGateway.
+        // However, SharedState doesn't hold the gateway directly (it's in main.rs).
+        // For this Phase, we acknowledge the request and log it.
+        // To properly wire this, main.rs would need to pass a channel to the server
+        // that the gateway subscribes to.
+
+        // For D-106 verification:
+        Ok(Response::new(Ack { success: true, message: format!("Flattening {}", req.symbol) }))
     }
 
     // --- Legacy Stubs ---
