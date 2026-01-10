@@ -13,6 +13,8 @@ use crate::reflex_proto::{
     PositionState, OrderState, // D-105
     TickHistoryRequest, // D-106
     LegislativeUpdate, // D-107
+    SovereignCommandRequest,
+    sovereign_command_request::CommandType,
 };
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
@@ -116,6 +118,35 @@ pub struct ReflexServerImpl {
 
 #[tonic::async_trait]
 impl ReflexService for ReflexServerImpl {
+    // D-86: Inject Sovereign Command
+    async fn inject_sovereign_command(&self, request: Request<SovereignCommandRequest>) -> Result<Response<Ack>, Status> {
+        let req = request.into_inner();
+        let cmd_type = CommandType::from_i32(req.r#type)
+            .ok_or_else(|| Status::invalid_argument("Invalid Command Type"))?;
+
+        let cmd = match cmd_type {
+             CommandType::Kill => SovereignCommand::Kill,
+             CommandType::Veto => SovereignCommand::Veto,
+             CommandType::Pause => SovereignCommand::Pause,
+             CommandType::Resume => SovereignCommand::Resume,
+             CommandType::CloseAll => SovereignCommand::CloseAll,
+             CommandType::SetSentiment => SovereignCommand::SetSentimentOverride(req.sentiment_value),
+             CommandType::ClearSentiment => SovereignCommand::ClearSentimentOverride,
+             CommandType::Unknown => return Err(Status::invalid_argument("Unknown Command Type")),
+        };
+
+        match self.authority_tx.send(cmd) {
+            Ok(_) => {
+                tracing::info!("🎛️ SOVEREIGN COMMAND INJECTED: {:?}", cmd_type);
+                Ok(Response::new(Ack { success: true, message: "Command Injected".into() }))
+            },
+            Err(e) => {
+                tracing::error!("❌ FAILED TO INJECT COMMAND: {}", e);
+                Err(Status::internal("Command Channel Closed"))
+            }
+        }
+    }
+
     async fn get_physics(&self, _request: Request<Empty>) -> Result<Response<PhysicsResponse>, Status> {
         let r = self.state.read().map_err(|_| Status::internal("Lock poisoned"))?;
         
@@ -224,12 +255,12 @@ impl ReflexService for ReflexServerImpl {
 
     async fn trigger_veto(&self, request: Request<VetoRequest>) -> Result<Response<Ack>, Status> {
         let req = request.into_inner();
-        let mut w = self.state.write().map_err(|_| Status::internal("Lock poisoned"))?;
+        tracing::warn!("☢️ MANUAL VETO REQUEST by {}: {}", req.operator, req.reason);
         
-        w.veto_active = true;
-        tracing::warn!("☢️ MANUAL VETO TRIGGERED by {}: {}", req.operator, req.reason);
-        
-        Ok(Response::new(Ack { success: true, message: "Veto Triggered".into() }))
+        match self.authority_tx.send(SovereignCommand::Veto) {
+            Ok(_) => Ok(Response::new(Ack { success: true, message: "Veto Triggered".into() })),
+            Err(_) => Err(Status::internal("Failed to send Veto Command")),
+        }
     }
 
     async fn demote_provisional(&self, _req: Request<DemoteRequest>) -> Result<Response<Ack>, Status> {

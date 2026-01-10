@@ -550,6 +550,7 @@ mod tests {
 
         let legislation = LegislativeState::default();
         let start = Instant::now();
+        let legislation = crate::governor::legislator::LegislativeState::default();
         for _ in 0..10_000 {
             // Using logic internal simulation for speed test
             let state = core.orient(physics.clone(), 0, None, "Neutral".to_string()).await;
