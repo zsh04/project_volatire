@@ -28,6 +28,24 @@ export namespace TickHistoryRequest {
   }
 }
 
+export class ClosePositionRequest extends jspb.Message {
+  getSymbol(): string;
+  setSymbol(value: string): ClosePositionRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): ClosePositionRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: ClosePositionRequest): ClosePositionRequest.AsObject;
+  static serializeBinaryToWriter(message: ClosePositionRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): ClosePositionRequest;
+  static deserializeBinaryFromReader(message: ClosePositionRequest, reader: jspb.BinaryReader): ClosePositionRequest;
+}
+
+export namespace ClosePositionRequest {
+  export type AsObject = {
+    symbol: string,
+  }
+}
+
 export class PhysicsResponse extends jspb.Message {
   getPrice(): number;
   setPrice(value: number): PhysicsResponse;
@@ -335,6 +353,28 @@ export namespace VetoRequest {
   export type AsObject = {
     reason: string,
     operator: string,
+  }
+}
+
+export class CancelOrderRequest extends jspb.Message {
+  getOrderId(): string;
+  setOrderId(value: string): CancelOrderRequest;
+
+  getSymbol(): string;
+  setSymbol(value: string): CancelOrderRequest;
+
+  serializeBinary(): Uint8Array;
+  toObject(includeInstance?: boolean): CancelOrderRequest.AsObject;
+  static toObject(includeInstance: boolean, msg: CancelOrderRequest): CancelOrderRequest.AsObject;
+  static serializeBinaryToWriter(message: CancelOrderRequest, writer: jspb.BinaryWriter): void;
+  static deserializeBinary(bytes: Uint8Array): CancelOrderRequest;
+  static deserializeBinaryFromReader(message: CancelOrderRequest, reader: jspb.BinaryReader): CancelOrderRequest;
+}
+
+export namespace CancelOrderRequest {
+  export type AsObject = {
+    orderId: string,
+    symbol: string,
   }
 }
 

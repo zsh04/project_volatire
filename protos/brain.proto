@@ -22,6 +22,9 @@ service BrainService {
 
     // Memory: Reflex saves a significant event (Trade/Veto) to Episodic Memory.
     rpc AddMemoryCheckpoint (MemoryCheckpoint) returns (Ack);
+
+    // Reset: Reflex triggers a hard reset of the Brain's internal state (AMR).
+    rpc ResetState (Empty) returns (Ack);
 }
 
 message ContextRequest {

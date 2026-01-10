@@ -63,4 +63,10 @@ impl BrainClient {
         let response = self.client.get_context(request).await?;
         Ok(response.into_inner())
     }
+
+    pub async fn reset_state(&mut self) -> Result<brain::Ack, tonic::Status> {
+        let request = tonic::Request::new(brain::Empty {});
+        let response = self.client.reset_state(request).await?;
+        Ok(response.into_inner())
+    }
 }

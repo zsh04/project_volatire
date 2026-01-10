@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { SovereignCommandRequest, SovereignCommandResponse } from '@/lib/governance';
+import { getReflexClient } from '@/lib/rpc/client';
+import * as grpc from '@grpc/grpc-js';
+import { cookies } from 'next/headers';
 
 /**
  * Directive-86: Sovereign Command API Endpoint
@@ -63,18 +66,89 @@ export async function POST(request: Request): Promise<NextResponse<SovereignComm
             }
         }
 
-        // Forward to Reflex via gRPC
-        const grpcUrl = process.env.REFLEX_GRPC_URL || 'http://localhost:50051';
+        // Special Case: VERIFY command
+        // If we reached this point, the key is valid.
+        if (req.command === 'VERIFY') {
+            const latency_ms = Date.now() - startTime;
+            return NextResponse.json({
+                success: true,
+                latency_ms,
+            });
+        }
 
-        // TODO: Implement actual gRPC call to Reflex
-        // For now, log the command
+        // Forward to Reflex via gRPC
         console.log(
             `SOVEREIGN COMMAND: ${req.command}`,
             req.payload ? `(payload: ${req.payload})` : ''
         );
 
+        const client = getReflexClient();
+        const metadata = new grpc.Metadata();
+        if (sovereignKey) {
+            metadata.add('x-sovereign-key', sovereignKey);
+        }
+
+        // Execute gRPC call based on command
+        // Mapping:
+        // KILL -> TriggerRatchet(KILL)
+        // VETO -> TriggerVeto
+        // PAUSE -> TriggerRatchet(FREEZE)
+        // RESUME -> TriggerRatchet(IDLE)
+        // CLOSE_ALL -> TriggerRatchet(TIGHTEN)
+        // SET_SENTIMENT_OVERRIDE -> UpdateConfig(sentiment_override, payload)
+        // CLEAR_SENTIMENT_OVERRIDE -> UpdateConfig(sentiment_override, -1)
+
+        await new Promise<void>((resolve, reject) => {
+            const callback = (err: any, response: any) => {
+                if (err) return reject(err);
+                if (response && !response.success) return reject(new Error(response.message || 'Unknown error'));
+                resolve();
+            };
+
+            switch (req.command) {
+                case 'KILL':
+                    client.triggerRatchet({ level: 3, reason: 'Sovereign Command: KILL' }, metadata, callback);
+                    break;
+                case 'VETO':
+                    client.triggerVeto({ reason: 'Sovereign Command: VETO', operator: 'Pilot' }, metadata, callback);
+                    break;
+                case 'PAUSE':
+                    client.triggerRatchet({ level: 2, reason: 'Sovereign Command: PAUSE' }, metadata, callback);
+                    break;
+                case 'RESUME':
+                    client.triggerRatchet({ level: 0, reason: 'Sovereign Command: RESUME' }, metadata, callback);
+                    break;
+                case 'CLOSE_ALL':
+                    client.triggerRatchet({ level: 1, reason: 'Sovereign Command: CLOSE_ALL' }, metadata, callback);
+                    break;
+                case 'SET_SENTIMENT_OVERRIDE':
+                    if (req.payload === undefined) return reject(new Error('Payload required for SET_SENTIMENT_OVERRIDE'));
+                    client.updateConfig({ key: 'sentiment_override', value: req.payload }, metadata, callback);
+                    break;
+                case 'CLEAR_SENTIMENT_OVERRIDE':
+                    client.updateConfig({ key: 'sentiment_override', value: -1 }, metadata, callback);
+                    break;
+                default:
+                    reject(new Error(`Unknown command: ${req.command}`));
+            }
+        });
+
+        // Determine User ID
+        // Priority: X-User-ID header > Cookie > Default 'pilot'
+        let userId = request.headers.get('x-user-id');
+        if (!userId) {
+            const cookieStore = cookies();
+            const userIdCookie = cookieStore.get('sovereign_user_id');
+            if (userIdCookie) {
+                userId = userIdCookie.value;
+            }
+        }
+
+        // Sanitize User ID (simple alpha-numeric check, fallback to 'pilot')
+        const safeUserId = userId ? userId.replace(/[^a-zA-Z0-9_-]/g, '') : 'pilot';
+
         // Log to audit trail (QuestDB)
-        await logSovereignCommand(req);
+        await logSovereignCommand(req, safeUserId);
 
         const latency_ms = Date.now() - startTime;
 
@@ -117,12 +191,12 @@ async function verifyWebAuthnSignature(
 /**
  * Log sovereign command to QuestDB audit trail
  */
-async function logSovereignCommand(req: SovereignCommandRequest): Promise<void> {
+async function logSovereignCommand(req: SovereignCommandRequest, userId: string): Promise<void> {
     const logEntry = {
         timestamp: new Date().toISOString(),
         command: req.command,
         payload: req.payload ?? null,
-        user_id: 'pilot', // TODO: Get from session
+        user_id: userId,
         signature: req.signature ? 'present' : 'none',
         latency_us: (Date.now() - req.timestamp) * 1000,
         source: 'WEB',

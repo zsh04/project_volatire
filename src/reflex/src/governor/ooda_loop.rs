@@ -8,12 +8,14 @@ use crate::telemetry::forensics::DecisionPacket;
 use tokio::sync::mpsc;
 use opentelemetry::trace::TraceContextExt;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+use crate::governor::legislator::LegislativeState; // D-107
 
 #[derive(Debug, Clone)]
 pub struct OODAState {
     pub physics: PhysicsState,
     pub sentiment_score: Option<f64>, // Narrative (Hypatia)
     pub nearest_regime: Option<String>, // Memory (LanceDB)
+    pub vector_distance: Option<f64>, // Similarity Score
     pub oriented_at: Instant,
     pub trace_id: String, // Traceability link
     pub brain_latency: Option<f64>, // ms
@@ -51,6 +53,7 @@ impl Default for OODAState {
             physics: PhysicsState::default(),
             sentiment_score: None,
             nearest_regime: None,
+            vector_distance: None,
             oriented_at: Instant::now(),
             trace_id: String::new(),
             brain_latency: None,
@@ -86,6 +89,7 @@ pub struct OODACore {
     pub binary_packer: BinaryPacker, // D-94
     pub ensemble_manager: EnsembleManager, // D-95
     pub phoenix_monitor: PhoenixMonitor, // D-96
+    pub symbol: String,
     pub forensic_tx: Option<mpsc::Sender<DecisionPacket>>,
     pub mirror_tx: Option<mpsc::Sender<DecisionPacket>>,
     pub decay_tx: Option<mpsc::Sender<DecisionPacket>>,
@@ -95,6 +99,7 @@ use crate::client::BrainClient;
 
 impl OODACore {
     pub fn new(
+        symbol: String,
         forensic_tx: Option<mpsc::Sender<DecisionPacket>>,
         mirror_tx: Option<mpsc::Sender<DecisionPacket>>,
         decay_tx: Option<mpsc::Sender<DecisionPacket>>
@@ -107,13 +112,14 @@ impl OODACore {
             nullifier: Nullifier::new(), // D-88
             red_team: RedTeam::new(), // D-93
             sync_gate: SyncGate::new(), // D-91
-            shadow_gate: ShadowGate::new(), // D-92
+            shadow_gate: ShadowGate::new(symbol.clone()), // D-92
             binary_packer: BinaryPacker::new(), // D-94
             ensemble_manager: EnsembleManager::new(), // D-95
             phoenix_monitor: PhoenixMonitor::new(), // D-96
             forensic_tx,
             mirror_tx,
             decay_tx,
+            symbol,
         }
     }
 
@@ -138,7 +144,7 @@ impl OODACore {
         let trace_id = cx.span().span_context().trace_id().to_string();
 
         // 1. Asynchronous Fetch Logic
-        let (sentiment, regime, latency) = if let Some(c) = client {
+        let (sentiment, regime, latency, distance) = if let Some(c) = client {
             // LIVE PATH (D-54)
             // D-87: COGNITIVE FIREWALL - Construct Truth Envelope
             let mut truth = TruthEnvelope {
@@ -148,9 +154,9 @@ impl OODACore {
                 jerk: physics.jerk,
                 sentiment_score: 0.0, // Initial seed
                 mid_price: physics.price,
-                bid_ask_spread: 0.0, // TODO: Ingest spread
+                bid_ask_spread: physics.bid_ask_spread,
                 regime_id,
-                sequence_id: 0,      // TODO: Pass sequence_id
+                sequence_id: physics.sequence_id,
             };
             
             // D-93: ADVERSARIAL STRESS INJECTION (The Red-Teamer)
@@ -181,7 +187,7 @@ impl OODACore {
                     // 1. Latency Check (Atomic Clock)
                     if let Err(e) = self.sync_gate.measure_latency(_start) {
                         tracing::warn!("BTC-91 SyncGate Violation (Latency): {:?}", e);
-                        (None, None, None)
+                        (None, None, None, None)
                     } else {
                         // Map Proto ContextResponse to LlmInferenceResponse for validation
                         // We treat context info as "inference" for validation purposes
@@ -197,29 +203,33 @@ impl OODACore {
                         Ok(_) => {
                             self.nullifier.reset_continuity(); // D-88: Success resets counter
                             let lat = ctx.computation_time_ns as f64 / 1_000_000.0;
-                            (Some(ctx.sentiment_score), Some(ctx.nearest_regime), Some(lat))
+                            (Some(ctx.sentiment_score), Some(ctx.nearest_regime), Some(lat), Some(ctx.regime_distance))
                         },
                         Err(e) => {
                             // D-88: NULLIFICATION "THE ERASER"
                             let triggered_amr = self.nullifier.nullify(e, ctx.reasoning.clone());
                             if triggered_amr {
                                 tracing::warn!("⚡ AMR: BRAIN RESET REQUESTED");
-                                // TODO: Actually trigger reset callback or signal if needed here
+                                if let Err(e) = c.reset_state().await {
+                                    tracing::error!("❌ Failed to send AMR Reset Signal: {}", e);
+                                } else {
+                                    tracing::info!("✅ AMR Reset Signal Sent to Brain.");
+                                }
                             }
                             
                             // Return BLIND STATE (Nullified)
-                            (None, None, None) 
+                            (None, None, None, None)
                         }
                     }
                 } // End SyncGate Else
                 },
                 Ok(Err(e)) => {
                     tracing::warn!("Brain Error: {}", e);
-                    (None, None, None) // Error -> Blind
+                    (None, None, None, None) // Error -> Blind
                 },
                 Err(_) => {
                     tracing::warn!("Brain Timeout (Jitter Violated)");
-                    (None, None, None) // Timeout -> Blind
+                    (None, None, None, None) // Timeout -> Blind
                 }
             }
         } else {
@@ -247,6 +257,7 @@ impl OODACore {
             physics,
             sentiment_score: sentiment,
             nearest_regime: regime,
+            vector_distance: distance,
             oriented_at: Instant::now(),
             trace_id,
             brain_latency: latency,
@@ -254,13 +265,13 @@ impl OODACore {
     }
 
     /// Mocks the external fetch to LanceDB / DistilBERT
-    fn fetch_semantics_simulated(&self) -> (Option<f64>, Option<String>, Option<f64>) {
+    fn fetch_semantics_simulated(&self) -> (Option<f64>, Option<String>, Option<f64>, Option<f64>) {
         // Simulate variability. 
         // Most of the time it's fast (cache), sometimes it lags.
         // For deterministic logic testing (not verify), we return instant mock.
         // For stress testing, we'd inject sleep.
         // Hardcoding a "Fast Path" scenario for default logic flow.
-        (Some(-0.8), Some("Liquidity Crisis 2020".to_string()), Some(12.5))
+        (Some(-0.8), Some("Liquidity Crisis 2020".to_string()), Some(12.5), Some(0.12))
     }
 
     /// ORIENT -> DECIDE
@@ -269,7 +280,7 @@ impl OODACore {
     /// Now includes Directive-43: Provisional Risk Sizing
     /// Now includes Directive-45: Nuclear Veto (Double-Key)
     #[tracing::instrument(skip(self))]
-    pub fn decide(&mut self, state: &OODAState, legislation: &crate::governor::legislator::LegislativeState) -> Decision {
+    pub fn decide(&mut self, state: &OODAState, legislation: &LegislativeState) -> Decision {
         let physics = &state.physics;
         
         // 1. Update Sentinel Components
@@ -387,7 +398,7 @@ impl OODACore {
             trace_id: state.trace_id.clone(),
             physics: state.physics.clone(),
             sentiment: state.sentiment_score.unwrap_or(0.0),
-            vector_distance: 0.0, // TODO: Retrieve from Semantic Fetch
+            vector_distance: state.vector_distance.unwrap_or(0.0),
             quantile_score: self.provisional.current_tier_index as i32,
             decision: format!("{:?}", decision.action),
             operator_hash: String::new(),
@@ -466,10 +477,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_veto_logic() {
-        let mut core = OODACore::new(None, None, None);
-        let legislation = LegislativeState::default();
+        let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None);
         
-        // Case: Bullish Physics
         // Case: Bullish Physics
         let physics = PhysicsState {
             price: 50000.0,
@@ -480,9 +489,10 @@ mod tests {
         };
 
         // Standard Orient (Simulated)
-        let state = core.orient(physics, 0, None, "NEUTRAL".to_string()).await;
+        let state = core.orient(physics, 0, None, "Neutral".to_string()).await;
         
         // Decide
+        let legislation = LegislativeState::default();
         let decision = core.decide(&state, &legislation);
         
         // EXPECTATION: HOLD/VETO because Sentiment is Negative (-0.8)
@@ -494,8 +504,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_jitter_fallback_logic() {
-        let mut core = OODACore::new(None, None, None);
-        let legislation = LegislativeState::default();
+        let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None);
         let physics = PhysicsState {
             price: 50000.0,
             velocity: 10.0,
@@ -509,11 +518,13 @@ mod tests {
             physics: physics.clone(),
             sentiment_score: None,
             nearest_regime: None,
+            vector_distance: None,
             oriented_at: Instant::now(),
             trace_id: "test_trace".to_string(),
             brain_latency: None,
         };
 
+        let legislation = LegislativeState::default();
         let decision = core.decide(&blind_state, &legislation);
         
         // Expectation: Buy, but with Reduced Size/Confidence (0.5 multiplier)
@@ -529,8 +540,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_cycle_latency() {
-        let mut core = OODACore::new(None, None, None);
-        let legislation = LegislativeState::default();
+        let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None);
         let physics = PhysicsState {
             price: 50000.0,
             velocity: 0.0,
@@ -539,10 +549,12 @@ mod tests {
             ..Default::default()
         };
 
+        let legislation = LegislativeState::default();
         let start = Instant::now();
+        let legislation = crate::governor::legislator::LegislativeState::default();
         for _ in 0..10_000 {
             // Using logic internal simulation for speed test
-            let state = core.orient(physics.clone(), 0, None, "NEUTRAL".to_string()).await;
+            let state = core.orient(physics.clone(), 0, None, "Neutral".to_string()).await;
             let dec = core.decide(&state, &legislation);
             core.act(dec, physics.price);
         }

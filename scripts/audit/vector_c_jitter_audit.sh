@@ -95,8 +95,9 @@ start_reflex_with_perf() {
     log_info "Starting perf stat on PID $REFLEX_PID..."
     
     # Monitor cache misses, context switches, and CPU cycles
-    perf stat -p "$REFLEX_PID" \
-        -e cache-misses,cache-references,context-switches,cpu-cycles \
+    # Use Interval mode (-I 100) for jitter calculation
+    perf stat -I 100 -p "$REFLEX_PID" \
+        -e cache-misses,cache-references,context-switches,cycles \
         -o "$OUTPUT_DIR/perf_stats.txt" &
     PERF_PID=$!
     
@@ -125,33 +126,13 @@ monitor_core_interrupts() {
 # Parse perf output for jitter
 extract_perf_jitter() {
     local perf_file="$1"
+    local field="${2:-ooda_jitter_max_us}"
     
-    # This would parse the perf output for cycle variance
-    # Placeholder implementation
-    echo "42"  # Mock jitter in microseconds
-}
-
-# Parse perf output for cache miss rate
-extract_cache_miss_rate() {
-    local perf_file="$1"
+    # Use python analyzer to extract stats
+    local result=$("$SCRIPT_DIR/lib/perf_analyzer.py" --input "$perf_file" --interval 0.1)
     
-    if [[ ! -f "$perf_file" ]]; then
-        echo "0.0"
-        return
-    fi
-    
-    # Extract cache misses and references from perf output
-    local misses=$(grep "cache-misses" "$perf_file" | awk '{print $1}' | tr -d ',')
-    local refs=$(grep "cache-references" "$perf_file" | awk '{print $1}' | tr -d ',')
-    
-    if [[ -z "$misses" ]] || [[ -z "$refs" ]] || [[ "$refs" -eq 0 ]]; then
-        echo "0.0"
-        return
-    fi
-    
-    # Calculate miss rate percentage
-    local miss_rate=$(echo "scale=2; ($misses / $refs) * 100" | bc)
-    echo "$miss_rate"
+    # Extract specific field using python one-liner (avoids jq dependency)
+    echo "$result" | python3 -c "import sys, json; print(json.load(sys.stdin).get('$field', 0.0))"
 }
 
 # Check Historian write bandwidth
@@ -227,13 +208,20 @@ main() {
     local bandwidth=$(check_historian_bandwidth)
     
     # Extract metrics
-    local jitter_us=$(extract_perf_jitter "$OUTPUT_DIR/perf_stats.txt")
-    local cache_miss_pct=$(extract_cache_miss_rate "$OUTPUT_DIR/perf_stats.txt")
+    # We call extract_perf_jitter multiple times or cache the JSON result.
+    # For simplicity, we'll re-run parsing or modify to get all at once.
+    # Let's get the full JSON from the analyzer once.
+    local perf_json=$("$SCRIPT_DIR/lib/perf_analyzer.py" --input "$OUTPUT_DIR/perf_stats.txt" --interval 0.1)
+
+    local jitter_us=$(echo "$perf_json" | python3 -c "import sys, json; print(json.load(sys.stdin).get('ooda_jitter_max_us', 0.0))")
+    local jitter_std_dev_us=$(echo "$perf_json" | python3 -c "import sys, json; print(json.load(sys.stdin).get('ooda_jitter_std_dev_us', 0.0))")
+    local cache_miss_pct=$(echo "$perf_json" | python3 -c "import sys, json; print(json.load(sys.stdin).get('cache_miss_rate_pct', 0.0))")
     
     # Evaluate results
     log_info "==========================================="
     log_info "Test Results:"
-    log_info "  OODA Loop Jitter: ${jitter_us}μs"
+    log_info "  OODA Loop Jitter (Max): ${jitter_us}μs"
+    log_info "  OODA Loop Jitter (StdDev): ${jitter_std_dev_us}μs"
     log_info "  Cache Miss Rate: ${cache_miss_pct}%"
     log_info "  Core Interrupts: ${test_interrupts}"
     log_info "  Historian Bandwidth: ${bandwidth} MB/min"
@@ -264,6 +252,7 @@ main() {
     local metrics_json=$(cat << EOF
 {
     "ooda_jitter_max_us": $jitter_us,
+    "ooda_jitter_std_dev_us": $jitter_std_dev_us,
     "cache_miss_rate_pct": $cache_miss_pct,
     "core_interrupts": $test_interrupts,
     "historian_bandwidth_mb_min": $bandwidth,
