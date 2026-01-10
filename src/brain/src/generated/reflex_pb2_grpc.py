@@ -54,6 +54,21 @@ class ReflexServiceStub(object):
                 request_serializer=reflex__pb2.DemoteRequest.SerializeToString,
                 response_deserializer=reflex__pb2.Ack.FromString,
                 _registered_method=True)
+        self.GetTickHistory = channel.unary_stream(
+                '/reflex.ReflexService/GetTickHistory',
+                request_serializer=reflex__pb2.TickHistoryRequest.SerializeToString,
+                response_deserializer=reflex__pb2.PhysicsResponse.FromString,
+                _registered_method=True)
+        self.InitiateIgnition = channel.unary_unary(
+                '/reflex.ReflexService/InitiateIgnition',
+                request_serializer=reflex__pb2.Empty.SerializeToString,
+                response_deserializer=reflex__pb2.Ack.FromString,
+                _registered_method=True)
+        self.UpdateLegislation = channel.unary_unary(
+                '/reflex.ReflexService/UpdateLegislation',
+                request_serializer=reflex__pb2.LegislativeUpdate.SerializeToString,
+                response_deserializer=reflex__pb2.Ack.FromString,
+                _registered_method=True)
         self.TriggerRatchet = channel.unary_unary(
                 '/reflex.ReflexService/TriggerRatchet',
                 request_serializer=reflex__pb2.RatchetRequest.SerializeToString,
@@ -67,7 +82,7 @@ class ReflexServiceStub(object):
         self.GetStream = channel.unary_stream(
                 '/reflex.ReflexService/GetStream',
                 request_serializer=reflex__pb2.Empty.SerializeToString,
-                response_deserializer=reflex__pb2.Heartbeat.FromString,
+                response_deserializer=reflex__pb2.PhysicsResponse.FromString,
                 _registered_method=True)
 
 
@@ -103,6 +118,27 @@ class ReflexServiceServicer(object):
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetTickHistory(self, request, context):
+        """D-106: Forensic Time Machine
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def InitiateIgnition(self, request, context):
+        """D-83: Initiate Ignition
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def UpdateLegislation(self, request, context):
+        """D-107: Turn Key (Update Legislation)
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
     def TriggerRatchet(self, request, context):
         """--- Legacy / Aux ---
         Force a risk level change
@@ -119,7 +155,7 @@ class ReflexServiceServicer(object):
         raise NotImplementedError('Method not implemented!')
 
     def GetStream(self, request, context):
-        """Stream heartbeat (Legacy, deprecated by WS)
+        """Stream Physics Data (Live Telemetry)
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -148,6 +184,21 @@ def add_ReflexServiceServicer_to_server(servicer, server):
                     request_deserializer=reflex__pb2.DemoteRequest.FromString,
                     response_serializer=reflex__pb2.Ack.SerializeToString,
             ),
+            'GetTickHistory': grpc.unary_stream_rpc_method_handler(
+                    servicer.GetTickHistory,
+                    request_deserializer=reflex__pb2.TickHistoryRequest.FromString,
+                    response_serializer=reflex__pb2.PhysicsResponse.SerializeToString,
+            ),
+            'InitiateIgnition': grpc.unary_unary_rpc_method_handler(
+                    servicer.InitiateIgnition,
+                    request_deserializer=reflex__pb2.Empty.FromString,
+                    response_serializer=reflex__pb2.Ack.SerializeToString,
+            ),
+            'UpdateLegislation': grpc.unary_unary_rpc_method_handler(
+                    servicer.UpdateLegislation,
+                    request_deserializer=reflex__pb2.LegislativeUpdate.FromString,
+                    response_serializer=reflex__pb2.Ack.SerializeToString,
+            ),
             'TriggerRatchet': grpc.unary_unary_rpc_method_handler(
                     servicer.TriggerRatchet,
                     request_deserializer=reflex__pb2.RatchetRequest.FromString,
@@ -161,7 +212,7 @@ def add_ReflexServiceServicer_to_server(servicer, server):
             'GetStream': grpc.unary_stream_rpc_method_handler(
                     servicer.GetStream,
                     request_deserializer=reflex__pb2.Empty.FromString,
-                    response_serializer=reflex__pb2.Heartbeat.SerializeToString,
+                    response_serializer=reflex__pb2.PhysicsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -283,6 +334,87 @@ class ReflexService(object):
             _registered_method=True)
 
     @staticmethod
+    def GetTickHistory(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_stream(
+            request,
+            target,
+            '/reflex.ReflexService/GetTickHistory',
+            reflex__pb2.TickHistoryRequest.SerializeToString,
+            reflex__pb2.PhysicsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def InitiateIgnition(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/reflex.ReflexService/InitiateIgnition',
+            reflex__pb2.Empty.SerializeToString,
+            reflex__pb2.Ack.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def UpdateLegislation(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/reflex.ReflexService/UpdateLegislation',
+            reflex__pb2.LegislativeUpdate.SerializeToString,
+            reflex__pb2.Ack.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
     def TriggerRatchet(request,
             target,
             options=(),
@@ -352,7 +484,7 @@ class ReflexService(object):
             target,
             '/reflex.ReflexService/GetStream',
             reflex__pb2.Empty.SerializeToString,
-            reflex__pb2.Heartbeat.FromString,
+            reflex__pb2.PhysicsResponse.FromString,
             options,
             channel_credentials,
             insecure,

@@ -44,6 +44,7 @@ impl BrainClient {
         &mut self,
         truth: &TruthEnvelope,
         legislative_bias: &str, // D-107
+        active_adapter: &str, // D-95
     ) -> Result<brain::ContextResponse, tonic::Status> {
         let envelope_json = serde_json::to_string(truth).unwrap_or_default();
         
@@ -56,6 +57,7 @@ impl BrainClient {
                 .as_millis() as i64,
             truth_envelope: envelope_json, 
             legislative_bias: legislative_bias.to_string(), // D-107
+            active_adapter: active_adapter.to_string(), // D-95
         });
 
         let response = self.client.get_context(request).await?;
