@@ -1,5 +1,6 @@
 use reflex::governor::ooda_loop::{OODACore, PhysicsState};
 use reflex::governor::legislator::LegislativeState;
+use reflex::db::state::RedisStateStore;
 use reflex::telemetry;
 use std::time::Duration;
 use tracing::info;
@@ -13,7 +14,8 @@ async fn test_telemetry_emission() {
     info!("TEST: Telemetry Initialized.");
 
     // 2. Setup OODA
-    let mut ooda = OODACore::new("BTC-USDT".to_string(), None, None, None);
+    let store = RedisStateStore::new("redis://127.0.0.1:6379/").await.unwrap();
+    let mut ooda = OODACore::new("BTC-USDT".to_string(), None, None, None, store);
     
     // 3. Create Mock State
     let physics = PhysicsState {

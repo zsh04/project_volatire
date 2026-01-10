@@ -16,8 +16,11 @@ pub struct PhysicsState {
     pub entropy: f64,       // Shannon Entropy ($H$)
     pub efficiency_index: f64, // Kaufman Efficiency Ratio
     pub basis: f64,         // Futures Basis (Annualized)
-    pub bid_ask_spread: f64,
     
+    // Directive-110: Perception
+    pub bid_ask_spread: f64,
+    pub volume: f64,
+
     // Directive-79: Global Sequence ID
     pub sequence_id: u64,
 }
@@ -35,6 +38,7 @@ impl Default for PhysicsState {
             efficiency_index: 0.0,
             basis: 0.0,
             bid_ask_spread: 0.0,
+            volume: 0.0,
             sequence_id: 0,
         }
     }
@@ -118,7 +122,7 @@ impl PhysicsEngine {
         
         // Guard: Zero Time Delta
         if dt_fast.abs() < f64::EPSILON {
-             // Avoid NaN, return previous state but update price/ts/seq
+             // Avoid NaN, return previous state but update price/ts/seq/volume/spread
              let mut same_state = self.prev_state;
              same_state.timestamp = timestamp;
              same_state.price = price;
@@ -163,6 +167,7 @@ impl PhysicsEngine {
             efficiency_index,
             basis: 0.0, // Default to 0.0 until Ingest Pipeline feeds Basis
             bid_ask_spread: spread,
+            volume: 0.0, // Assuming volume is not passed in update for now, or default it
             sequence_id,
         };
 

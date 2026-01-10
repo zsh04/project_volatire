@@ -28,6 +28,7 @@ use std::time::{Duration, Instant};
 use tracing::{info, warn, error};
 
 use reflex::governor::regime_detector::{RegimeDetector, MarketRegime}; // D-87
+use reflex::config::Config;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -37,13 +38,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         Err(e) => println!("⚠️ Failed to load .env: {}", e),
     }
 
+    // Load Config
+    let config = Config::load().expect("Failed to load configuration");
+
     // 1. Initialize Telemetry (Directive-47)
     telemetry::init_telemetry().map_err(|e| e as Box<dyn std::error::Error>)?;
     info!("Voltaire Reflex Engine v1.0.0 (Phase 5) - Telemetry Active");
 
     // --- Configuration ---
-    let db_url = std::env::var("DATABASE_URL").unwrap_or_else(|_| "postgresql://admin:quest@localhost:8812/qdb".to_string());
-    let parsed_url = url::Url::parse(&db_url).expect("Invalid DATABASE_URL");
+    let db_url = &config.database_url;
+    let parsed_url = url::Url::parse(db_url).map_err(|e| format!("Invalid DATABASE_URL: {}", e))?;
     
     let sql_user = parsed_url.username();
     let sql_pass = parsed_url.password().unwrap_or("quest");
@@ -51,8 +55,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let sql_db = parsed_url.path().trim_start_matches('/').to_string();
     let _sql_port = parsed_url.port().unwrap_or(8812);
 
-    let ilp_host = std::env::var("QUESTDB_HOST").unwrap_or_else(|_| "localhost".to_string());
-    let ilp_port = std::env::var("QUESTDB_ILP_PORT").unwrap_or_else(|_| "9009".to_string());
+    let ilp_host = &config.questdb_host;
+    let ilp_port = &config.questdb_ilp_port;
     let ilp_addr = format!("{}:{}", ilp_host, ilp_port);
 
     // --- Directive-69: Genesis Orchestrator ---
@@ -100,27 +104,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // --- Directive-41 & 42: State Supercharger & Kinetic Pipe ---
-    let redis_url = "redis://localhost:6379/";
+    let redis_url = &config.redis_url;
     println!("⚡ Connecting to DragonflyDB (L1 State) at {}...", redis_url);
     
     // Initialize Pool
     let state_store_res = db::state::RedisStateStore::new(redis_url).await;
-    let _state_store = match state_store_res {
+    let state_store = match state_store_res {
         Ok(s) => {
              match s.ping().await {
                  Ok(_) => {
                      println!("✅ DragonflyDB Connection: ESTABLISHED");
-                     Some(s)
+                     s
                  },
                  Err(e) => {
-                     eprintln!("❌ DragonflyDB PING FAILED: {}", e);
-                     None
+                     // We panic here because StateStore is critical for OODA Loop functionality
+                     panic!("❌ DragonflyDB PING FAILED: {}", e);
                  }
              }
         },
         Err(e) => {
-            eprintln!("❌ DragonflyDB Connection INIT FAILED: {}", e);
-            None
+            panic!("❌ DragonflyDB Connection INIT FAILED: {}", e);
         }
     };
 
@@ -271,7 +274,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Update OODA Core with Decay Channel
-    let mut ooda = reflex::governor::ooda_loop::OODACore::new("BTC-USDT".to_string(), Some(forensic_tx), Some(mirror_tx), Some(decay_tx));
+    let mut ooda = reflex::governor::ooda_loop::OODACore::new(
+        "BTC-USDT".to_string(),
+        Some(forensic_tx),
+        Some(mirror_tx),
+        Some(decay_tx),
+        state_store.clone()
+    );
 
     // D-86: Authority Bridge (Sovereign Command Channel)
     let (mut authority_bridge, authority_tx) = reflex::governor::authority::AuthorityBridge::new();
@@ -349,11 +358,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // --- Directive-72: Account Sync Channel ---
     let (balance_tx, mut balance_rx) = tokio::sync::mpsc::channel(10);
     if !is_sim_mode_flag {
+        let key = config.kraken_api_key.clone();
+        let secret = config.kraken_secret.clone();
+
         tokio::spawn(async move {
             tokio::time::sleep(Duration::from_secs(5)).await;
-            
-            let key = std::env::var("KRAKEN_API_KEY").unwrap_or_default();
-            let secret = std::env::var("KRAKEN_API_SECRET").unwrap_or_default();
             
             if key.is_empty() {
                 warn!("⚠️ KRAKEN KEYS MISSING. Account Sync Disabled.");
@@ -747,7 +756,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         // ideally we broadcast the immutable state. 
         // For simplicity, we clone the struct.
         let broadcast_payload = {
-            let r = shared_state.read().unwrap();
+            let r = shared_state.read().expect("Lock poisoned");
             r.clone()
         };
         let _ = tx_broadcast.send(broadcast_payload);
@@ -768,4 +777,3 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     
     Ok(())
 }
-

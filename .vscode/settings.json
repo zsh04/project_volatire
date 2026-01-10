@@ -1,0 +1,32 @@
+{
+    "files.watcherExclude": {
+        "**/.git/objects/**": true,
+        "**/.git/subtree-cache/**": true,
+        "**/node_modules/**": true,
+        "**/target/**": true,
+        "**/venv/**": true,
+        "**/__pycache__/**": true,
+        "**/.mypy_cache/**": true,
+        "**/dist/**": true,
+        "**/build/**": true,
+        "**/.pytest_cache/**": true
+    },
+    "search.exclude": {
+        "**/node_modules": true,
+        "**/bower_components": true,
+        "**/target": true,
+        "**/venv": true,
+        "**/__pycache__": true,
+        "**/.mypy_cache": true,
+        "**/*.code-search": true
+    },
+    "rust-analyzer.checkOnSave.command": "clippy",
+    "rust-analyzer.files.excludeDirs": [
+        "target",
+        "node_modules"
+    ],
+    "python.analysis.exclude": [
+        "**/venv",
+        "**/__pycache__"
+    ]
+}

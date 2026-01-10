@@ -44,6 +44,15 @@ class KeplerOracle:
 
             # Check Environment
             env = os.getenv("VOLTAIRE_ENV", "SIMULATION").upper()
+
+            # D-109: Process Isolation. If MOCK, do not load weights.
+            if env == "MOCK":
+                logger.warning(
+                    "⚠️ VOLTAIRE_ENV=MOCK detected. Skipping Model Load. Using Heuristic Forecasts."
+                )
+                self._mock_mode = True
+                return
+
             self._mock_mode = False
 
             logger.info(

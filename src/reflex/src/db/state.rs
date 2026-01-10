@@ -139,6 +139,7 @@ mod tests {
             efficiency_index: 0.9,
             basis: 0.0,
             bid_ask_spread: 0.05,
+            volume: 100.0,
             sequence_id: 0,
         };
 
@@ -171,6 +172,7 @@ mod tests {
             efficiency_index: 0.9,
             basis: 0.0,
             bid_ask_spread: 0.05,
+            volume: 100.0,
             sequence_id: 0,
         };
 

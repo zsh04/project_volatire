@@ -23,7 +23,7 @@ pub enum ShadowStatus {
 }
 
 pub struct ShadowGate {
-    pub symbol: String,
+    pub symbol: String, // D-110: Parameterized Symbol
     pub virtual_book: HashMap<String, ShadowOrder>,
     pub latency_simulation_ms: u64,
 }
@@ -54,7 +54,7 @@ impl ShadowGate {
         // In reality, they might be Market orders, but we track slippage against this price.
         let order = ShadowOrder {
             id: id.clone(),
-            symbol: self.symbol.clone(),
+            symbol: self.symbol.clone(), // D-110: Parameterized
             side: side.to_string(),
             qty,
             limit_price,

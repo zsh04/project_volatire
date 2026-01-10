@@ -106,11 +106,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // --- OODA Core Initialization ---
+    // In live_runner, we must panic if state store is missing as it's critical
+    let store_for_ooda = state_store.clone().expect("Redis State Store is required for Live Runner");
     let mut ooda = governor::ooda_loop::OODACore::new(
         live_symbol.clone(),
         Some(forensic_tx),
         Some(mirror_tx),
-        Some(decay_tx)
+        Some(decay_tx),
+        store_for_ooda
     );
 
     // --- Connect to Brain Service ---

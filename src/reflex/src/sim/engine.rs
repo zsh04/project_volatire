@@ -247,4 +247,3 @@ impl SimulationEngine {
         Ok(final_equity)
     }
 }
-
