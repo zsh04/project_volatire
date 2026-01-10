@@ -150,7 +150,7 @@ impl OODACore {
                 mid_price: physics.price,
                 bid_ask_spread: 0.0, // TODO: Ingest spread
                 regime_id,
-                sequence_id: 0,      // TODO: Pass sequence_id
+                sequence_id: physics.sequence_id,
             };
             
             // D-93: ADVERSARIAL STRESS INJECTION (The Red-Teamer)
@@ -466,6 +466,7 @@ impl OODACore {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::governor::legislator::LegislativeState;
 
     #[tokio::test]
     async fn test_veto_logic() {
@@ -482,10 +483,11 @@ mod tests {
         };
 
         // Standard Orient (Simulated)
-        let state = core.orient(physics, 0, None).await;
+        let state = core.orient(physics, 0, None, "Neutral".to_string()).await;
         
         // Decide
-        let decision = core.decide(&state);
+        let legislation = LegislativeState::default();
+        let decision = core.decide(&state, &legislation);
         
         // EXPECTATION: HOLD/VETO because Sentiment is Negative (-0.8)
         match decision.action {
@@ -512,9 +514,11 @@ mod tests {
             nearest_regime: None,
             oriented_at: Instant::now(),
             trace_id: "test_trace".to_string(),
+            brain_latency: None,
         };
 
-        let decision = core.decide(&blind_state);
+        let legislation = LegislativeState::default();
+        let decision = core.decide(&blind_state, &legislation);
         
         // Expectation: Buy, but with Reduced Size/Confidence (0.5 multiplier)
         if let Action::Buy(pct) = decision.action {
@@ -538,11 +542,12 @@ mod tests {
             ..Default::default()
         };
 
+        let legislation = LegislativeState::default();
         let start = Instant::now();
         for _ in 0..10_000 {
             // Using logic internal simulation for speed test
-            let state = core.orient(physics.clone(), 0, None).await;
-            let dec = core.decide(&state);
+            let state = core.orient(physics.clone(), 0, None, "Neutral".to_string()).await;
+            let dec = core.decide(&state, &legislation);
             core.act(dec, physics.price);
         }
         let total = start.elapsed();
