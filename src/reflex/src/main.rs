@@ -269,11 +269,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Update OODA Core with Decay Channel
     let mut ooda = reflex::governor::ooda_loop::OODACore::new(Some(forensic_tx), Some(mirror_tx), Some(decay_tx));
 
+    // D-86: Authority Bridge (Sovereign Command Channel)
+    let (mut authority_bridge, authority_tx) = reflex::governor::authority::AuthorityBridge::new();
+
     // Spawn API Server
     let server_state = shared_state.clone();
     let server_tx = tx_broadcast.clone(); // Pass Sender for subscribing
+    let server_auth_tx = authority_tx.clone();
     let _server_handle = tokio::spawn(async move {
-        reflex::server::run_server(server_state, server_tx).await;
+        reflex::server::run_server(server_state, server_tx, server_auth_tx).await;
     });
 
 
@@ -375,9 +379,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // D-83: Ignition Sequence (Capital Gate)
     let mut ignition = reflex::governor::ignition::IgnitionSequence::new();
 
-    // D-86: Authority Bridge (Sovereign Command Channel)
-    let (mut authority_bridge, _authority_tx) = reflex::governor::authority::AuthorityBridge::new();
-    // TODO: Pass authority_tx to gRPC server for command injection
 
     // D-90: Rebalancer (The Governor)
     let mut rebalancer = reflex::governor::rebalancer::Rebalancer::new(50000.0); // Match Ledger
