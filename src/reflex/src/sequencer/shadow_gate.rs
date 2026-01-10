@@ -26,6 +26,7 @@ pub struct ShadowGate {
     pub symbol: String,
     pub virtual_book: HashMap<String, ShadowOrder>,
     pub latency_simulation_ms: u64,
+    pub symbol: String, // D-110: Parameterized Symbol
 }
 
 impl ShadowGate {
@@ -34,6 +35,7 @@ impl ShadowGate {
             symbol,
             virtual_book: HashMap::new(),
             latency_simulation_ms: 500, // D-54: Exchange Latency Sim
+            symbol,
         }
     }
 
@@ -54,7 +56,11 @@ impl ShadowGate {
         // In reality, they might be Market orders, but we track slippage against this price.
         let order = ShadowOrder {
             id: id.clone(),
+<<<<<<< HEAD
             symbol: self.symbol.clone(),
+=======
+            symbol: self.symbol.clone(), // D-110: Parameterized
+>>>>>>> feb49d06 (pushing local changes.)
             side: side.to_string(),
             qty,
             limit_price,

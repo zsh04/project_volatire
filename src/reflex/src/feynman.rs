@@ -18,6 +18,10 @@ pub struct PhysicsState {
     pub basis: f64,         // Futures Basis (Annualized)
     pub bid_ask_spread: f64,
     
+    // Directive-110: Perception
+    pub spread: f64,
+    pub volume: f64,
+
     // Directive-79: Global Sequence ID
     pub sequence_id: u64,
 }
@@ -34,7 +38,12 @@ impl Default for PhysicsState {
             entropy: 0.0,
             efficiency_index: 0.0,
             basis: 0.0,
+<<<<<<< HEAD
             bid_ask_spread: 0.0,
+=======
+            spread: 0.0,
+            volume: 0.0,
+>>>>>>> feb49d06 (pushing local changes.)
             sequence_id: 0,
         }
     }
@@ -75,7 +84,11 @@ impl PhysicsEngine {
         }
     }
 
+<<<<<<< HEAD
     pub fn update(&mut self, price: f64, timestamp: f64, sequence_id: u64, spread: f64) -> PhysicsState {
+=======
+    pub fn update(&mut self, price: f64, timestamp: f64, spread: f64, volume: f64, sequence_id: u64) -> PhysicsState {
+>>>>>>> feb49d06 (pushing local changes.)
         // 1. Update History
         if self.history.len() >= self.capacity {
             self.history.pop_front();
@@ -118,12 +131,17 @@ impl PhysicsEngine {
         
         // Guard: Zero Time Delta
         if dt_fast.abs() < f64::EPSILON {
-             // Avoid NaN, return previous state but update price/ts/seq
+             // Avoid NaN, return previous state but update price/ts/seq/volume/spread
              let mut same_state = self.prev_state;
              same_state.timestamp = timestamp;
              same_state.price = price;
              same_state.sequence_id = sequence_id;
+<<<<<<< HEAD
              same_state.bid_ask_spread = spread;
+=======
+             same_state.spread = spread;
+             same_state.volume = volume;
+>>>>>>> feb49d06 (pushing local changes.)
              return same_state;
         }
 
@@ -162,7 +180,12 @@ impl PhysicsEngine {
             entropy,
             efficiency_index,
             basis: 0.0, // Default to 0.0 until Ingest Pipeline feeds Basis
+<<<<<<< HEAD
             bid_ask_spread: spread,
+=======
+            spread,
+            volume,
+>>>>>>> feb49d06 (pushing local changes.)
             sequence_id,
         };
 
@@ -278,7 +301,11 @@ mod tests {
         // 1. Stable period
         // Feed 200 ticks of stable price 100.0
         for i in 0..200 {
+<<<<<<< HEAD
             engine.update(100.0, i as f64, 0, 0.0);
+=======
+            engine.update(100.0, i as f64, 0.1, 100.0, 0);
+>>>>>>> feb49d06 (pushing local changes.)
         }
         
         // 2. Sudden Spike upwards
@@ -298,7 +325,11 @@ mod tests {
         // Let's implement the test_impulse as requested: 
         // Feed sudden spike.
         
+<<<<<<< HEAD
         let s = engine.update(110.0, 200.0, 0, 0.0); // Step from 199->200
+=======
+        let s = engine.update(110.0, 200.0, 0.1, 100.0, 0); // Step from 199->200
+>>>>>>> feb49d06 (pushing local changes.)
         
         // Log logic check:
         // Past (100 ticks ago) = index 200 - 1 - 100 = 99.
@@ -323,7 +354,11 @@ mod tests {
         for i in 0..1100 {
             let noise = (i as f64 * 37.0).sin() * 5.0; // Oscillates fast
             let price = 1000.0 + noise;
+<<<<<<< HEAD
             let s = engine.update(price, i as f64, 0, 0.0);
+=======
+            let s = engine.update(price, i as f64, 0.1, 100.0, 0);
+>>>>>>> feb49d06 (pushing local changes.)
             
             if i > 1050 {
                 // Should be high entropy (randomness) and low efficiency (choppy)
@@ -347,13 +382,21 @@ mod tests {
         
         // Feed linear ramp 0..300
         for i in 0..300 {
+<<<<<<< HEAD
             engine.update(i as f64, i as f64, 0, 0.0);
+=======
+            engine.update(i as f64, i as f64, 0.1, 100.0, 0);
+>>>>>>> feb49d06 (pushing local changes.)
         }
         
         // At i=300 (t=300, p=300)
         // Past is t=200, p=200.
         // v = (300-200)/(300-200) = 1.0.
+<<<<<<< HEAD
         let s = engine.update(300.0, 300.0, 0, 0.0);
+=======
+        let s = engine.update(300.0, 300.0, 0.1, 100.0, 0);
+>>>>>>> feb49d06 (pushing local changes.)
         assert!((s.velocity - 1.0).abs() < 1e-5);
         assert!((s.acceleration).abs() < 1e-5);
     }
@@ -364,10 +407,17 @@ mod tests {
         
         // Feed > 1000 ticks of pure trend to trigger checks
         for i in 0..1100 {
+<<<<<<< HEAD
             engine.update(i as f64, i as f64, 0, 0.0);
         }
         
         let s = engine.update(1100.0, 1100.0, 0, 0.0);
+=======
+            engine.update(i as f64, i as f64, 0.1, 100.0, 0);
+        }
+        
+        let s = engine.update(1100.0, 1100.0, 0.1, 100.0, 0);
+>>>>>>> feb49d06 (pushing local changes.)
         // ER should be 1.0
         assert!((s.efficiency_index - 1.0).abs() < 1e-5);
     }

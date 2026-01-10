@@ -100,14 +100,55 @@ pub fn parse_kraken_trade(msg: &str) -> Option<Vec<Tick>> {
         return None;
     }
     
-    // Check if this is a trade message (channel name should be "trade")
-    if let Some(channel_name) = arr.get(2).and_then(|v| v.as_str()) {
-        if channel_name != "trade" {
-            return None;
-        }
-    } else {
-        return None;
+    // Check Channel Name
+    let channel_name = arr.get(2).and_then(|v| v.as_str())?;
+    
+    match channel_name {
+        "trade" => {
+            // ... (Existing Trade Logic)
+            let trades = arr.get(1)?.as_array()?;
+            let mut ticks = Vec::new();
+            
+            for trade_data in trades {
+                let trade_arr = trade_data.as_array()?;
+                if trade_arr.len() < 3 { continue; }
+                
+                let price: f64 = trade_arr.get(0)?.as_str()?.parse().ok()?;
+                let volume: f64 = trade_arr.get(1)?.as_str()?.parse().ok()?;
+                let timestamp: f64 = trade_arr.get(2)?.as_f64()?;
+                
+                ticks.push(Tick {
+                    timestamp: timestamp * 1000.0,
+                    price,
+                    quantity: volume,
+                    bid: None,
+                    ask: None,
+                });
+            }
+            Some(ticks)
+        },
+        "spread" => {
+            // Spread format: [bid, ask, timestamp, bidVol, askVol]
+            let spread_data = arr.get(1)?.as_array()?;
+            if spread_data.len() < 3 { return None; }
+
+            let bid: f64 = spread_data.get(0)?.as_str()?.parse().ok()?;
+            let ask: f64 = spread_data.get(1)?.as_str()?.parse().ok()?;
+            let timestamp: f64 = spread_data.get(2)?.as_f64()?;
+
+            // Treat spread update as a Tick with 0 volume but valid bid/ask
+            let tick = Tick {
+                timestamp: timestamp * 1000.0,
+                price: (bid + ask) / 2.0, // Mid price as proxy
+                quantity: 0.0,
+                bid: Some(bid),
+                ask: Some(ask),
+            };
+            Some(vec![tick])
+        },
+        _ => None,
     }
+<<<<<<< HEAD
     
     // Extract trade array (index 1)
     let trades = arr.get(1)?.as_array()?;
@@ -133,6 +174,8 @@ pub fn parse_kraken_trade(msg: &str) -> Option<Vec<Tick>> {
     }
     
     Some(ticks)
+=======
+>>>>>>> feb49d06 (pushing local changes.)
 }
 
 #[cfg(test)]

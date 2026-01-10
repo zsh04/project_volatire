@@ -13,6 +13,10 @@ pub struct Tick {
     pub timestamp: f64, // Unix Timestamp (ms)
     pub price: f64,
     pub quantity: f64,
+<<<<<<< HEAD
+=======
+    // D-110: Perception
+>>>>>>> feb49d06 (pushing local changes.)
     pub bid: Option<f64>,
     pub ask: Option<f64>,
 }

@@ -115,7 +115,11 @@ impl OODACore {
             nullifier: Nullifier::new(), // D-88
             red_team: RedTeam::new(), // D-93
             sync_gate: SyncGate::new(), // D-91
+<<<<<<< HEAD
             shadow_gate: ShadowGate::new(symbol.clone()), // D-92
+=======
+            shadow_gate: ShadowGate::new(symbol), // D-92 & D-110
+>>>>>>> feb49d06 (pushing local changes.)
             binary_packer: BinaryPacker::new(), // D-94
             ensemble_manager: EnsembleManager::new(), // D-95
             phoenix_monitor: PhoenixMonitor::new(), // D-96
@@ -158,7 +162,11 @@ impl OODACore {
                 jerk: physics.jerk,
                 sentiment_score: 0.0, // Initial seed
                 mid_price: physics.price,
+<<<<<<< HEAD
                 bid_ask_spread: physics.bid_ask_spread,
+=======
+                bid_ask_spread: physics.spread, // D-110: Real Spread
+>>>>>>> feb49d06 (pushing local changes.)
                 regime_id,
                 sequence_id: physics.sequence_id,
             };
@@ -481,8 +489,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_veto_logic() {
+<<<<<<< HEAD
         let store = RedisStateStore::new("redis://127.0.0.1:6379/").await.unwrap();
         let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None, store);
+=======
+        let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None);
+>>>>>>> feb49d06 (pushing local changes.)
         
         // Case: Bullish Physics
         let physics = PhysicsState {
@@ -494,11 +506,18 @@ mod tests {
         };
 
         // Standard Orient (Simulated)
+<<<<<<< HEAD
         let state = core.orient(physics, 0, None, "Neutral".to_string()).await;
         
         // Decide
         let legislation = LegislativeState::default();
         let decision = core.decide(&state, &legislation);
+=======
+        let state = core.orient(physics, 0, None, "NEUTRAL".to_string()).await;
+        
+        // Decide
+        let decision = core.decide(&state, &crate::governor::legislator::LegislativeState::default());
+>>>>>>> feb49d06 (pushing local changes.)
         
         // EXPECTATION: HOLD/VETO because Sentiment is Negative (-0.8)
         match decision.action {
@@ -509,8 +528,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_jitter_fallback_logic() {
+<<<<<<< HEAD
         let store = RedisStateStore::new("redis://127.0.0.1:6379/").await.unwrap();
         let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None, store);
+=======
+        let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None);
+>>>>>>> feb49d06 (pushing local changes.)
         let physics = PhysicsState {
             price: 50000.0,
             velocity: 10.0,
@@ -530,8 +553,12 @@ mod tests {
             brain_latency: None,
         };
 
+<<<<<<< HEAD
         let legislation = LegislativeState::default();
         let decision = core.decide(&blind_state, &legislation);
+=======
+        let decision = core.decide(&blind_state, &crate::governor::legislator::LegislativeState::default());
+>>>>>>> feb49d06 (pushing local changes.)
         
         // Expectation: Buy, but with Reduced Size/Confidence (0.5 multiplier)
         if let Action::Buy(pct) = decision.action {
@@ -546,8 +573,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_cycle_latency() {
+<<<<<<< HEAD
         let store = RedisStateStore::new("redis://127.0.0.1:6379/").await.unwrap();
         let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None, store);
+=======
+        let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None);
+>>>>>>> feb49d06 (pushing local changes.)
         let physics = PhysicsState {
             price: 50000.0,
             velocity: 0.0,
@@ -561,8 +592,13 @@ mod tests {
         let legislation = crate::governor::legislator::LegislativeState::default();
         for _ in 0..10_000 {
             // Using logic internal simulation for speed test
+<<<<<<< HEAD
             let state = core.orient(physics.clone(), 0, None, "Neutral".to_string()).await;
             let dec = core.decide(&state, &legislation);
+=======
+            let state = core.orient(physics.clone(), 0, None, "NEUTRAL".to_string()).await;
+            let dec = core.decide(&state, &crate::governor::legislator::LegislativeState::default());
+>>>>>>> feb49d06 (pushing local changes.)
             core.act(dec, physics.price);
         }
         let total = start.elapsed();

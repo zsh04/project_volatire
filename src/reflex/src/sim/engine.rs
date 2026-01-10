@@ -94,9 +94,14 @@ impl SimulationEngine {
                     }
 
                     // 1. Update Physics
+<<<<<<< HEAD
                     let spread = 0.0; // Sim data doesn't imply spread currently (Tick has bid/ask=None).
                                       // If we want sim spread, we need to update sim source or assume defaults.
                     let state = self.physics.update(tick.price, tick.timestamp, 0, spread);
+=======
+                    // 1. Update Physics
+                    let state = self.physics.update(tick.price, tick.timestamp, 0.1, tick.quantity, 0);
+>>>>>>> feb49d06 (pushing local changes.)
 
                     // --- D-101: Pessimistic Fill Logic (FIFO Queue) ---
                     // Process Pending Orders BEFORE generating new ones

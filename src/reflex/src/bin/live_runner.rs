@@ -178,8 +178,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
         
         // Physics Update
+<<<<<<< HEAD
         let spread = if let (Some(b), Some(a)) = (tick.bid, tick.ask) { a - b } else { 0.0 };
         let physics = feynman.update(tick.price, tick.timestamp, 0, spread);
+=======
+        let spread = if let (Some(bid), Some(ask)) = (tick.bid, tick.ask) {
+            ask - bid
+        } else {
+            0.1 // Default/Stale
+        };
+        let physics = feynman.update(tick.price, tick.timestamp, spread, tick.quantity, 0);
+>>>>>>> feb49d06 (pushing local changes.)
 
         // OODA Orient
         let ooda_state = ooda.orient(physics.clone(), 0, brain_client.as_mut(), "NEUTRAL".to_string()).await;

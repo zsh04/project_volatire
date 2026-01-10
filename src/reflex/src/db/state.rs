@@ -138,7 +138,12 @@ mod tests {
             entropy: 0.8,
             efficiency_index: 0.9,
             basis: 0.0,
+<<<<<<< HEAD
             bid_ask_spread: 0.05,
+=======
+            spread: 0.1,
+            volume: 100.0,
+>>>>>>> feb49d06 (pushing local changes.)
             sequence_id: 0,
         };
 
@@ -170,7 +175,12 @@ mod tests {
             entropy: 0.8,
             efficiency_index: 0.9,
             basis: 0.0,
+<<<<<<< HEAD
             bid_ask_spread: 0.05,
+=======
+            spread: 0.1,
+            volume: 100.0,
+>>>>>>> feb49d06 (pushing local changes.)
             sequence_id: 0,
         };
 

@@ -53,10 +53,25 @@ async fn connect_kraken_loop(url: &Url, pair: &str, tx: &mpsc::Sender<Tick>)
             "name": "ticker"
         }
     });
+
+    // D-110: Also subscribe to spread for bid/ask perception
+    let subscribe_spread = serde_json::json!({
+        "event": "subscribe",
+        "pair": [pair],
+        "subscription": {
+            "name": "spread"
+        }
+    });
     
+<<<<<<< HEAD
     let sub_text = serde_json::to_string(&subscribe_msg)?;
     write.send(Message::Text(sub_text)).await?;
     info!("Kraken Ingest: Subscribed to {} ticker", pair);
+=======
+    write.send(Message::Text(serde_json::to_string(&subscribe_msg)?)).await?;
+    write.send(Message::Text(serde_json::to_string(&subscribe_spread)?)).await?;
+    info!("Kraken Ingest: Subscribed to {} trades & spread", pair);
+>>>>>>> feb49d06 (pushing local changes.)
     
     while let Some(msg) = read.next().await {
         let msg = msg?;

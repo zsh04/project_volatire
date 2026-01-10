@@ -48,10 +48,13 @@ pub fn init_telemetry() -> Result<(), Box<dyn std::error::Error + Send + Sync + 
     let log_layer = opentelemetry_appender_tracing::layer::OpenTelemetryTracingBridge::new(&opentelemetry::global::logger_provider());
 
     // 4. Connect to Tracing Subscriber
-    let telemetry = tracing_opentelemetry::layer().with_tracer(tracer);
+    // D-109: Add EnvFilter to control verbosity (Default: WARN for crates, DEBUG for reflex)
+    let filter = tracing_subscriber::EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("warn,reflex=debug"));
 
     let subscriber = Registry::default()
-        .with(telemetry)
+        .with(filter) // Add filter layer
+        .with(tracing_opentelemetry::layer().with_tracer(tracer))
         .with(log_layer)
         .with(tracing_subscriber::fmt::layer());
 

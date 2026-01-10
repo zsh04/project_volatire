@@ -274,6 +274,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     // Update OODA Core with Decay Channel
+<<<<<<< HEAD
     let mut ooda = reflex::governor::ooda_loop::OODACore::new(
         "BTC-USDT".to_string(),
         Some(forensic_tx),
@@ -284,6 +285,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // D-86: Authority Bridge (Sovereign Command Channel)
     let (mut authority_bridge, authority_tx) = reflex::governor::authority::AuthorityBridge::new();
+=======
+    let mut ooda = reflex::governor::ooda_loop::OODACore::new("XBT/USD".to_string(), Some(forensic_tx), Some(mirror_tx), Some(decay_tx));
+>>>>>>> feb49d06 (pushing local changes.)
 
     // Spawn API Server
     let server_state = shared_state.clone();
@@ -496,20 +500,37 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         let _enter = span.enter();
 
         // --- Directive-72: LIVE DATA ORIGIN ---
+<<<<<<< HEAD
         let (price, volume) = if is_sim_mode_flag {
+=======
+        let (price, spread, volume) = if is_sim_mode_flag {
+>>>>>>> feb49d06 (pushing local changes.)
              let phase = (now_ms / 1000.0) * std::f64::consts::PI; 
              let signal = phase.sin() * 5.0;
              let noise = (rand::random::<f64>() - 0.5) * 2.0;
              let spike = if now_ms > 5000.0 && now_ms < 5500.0 { 10.0 } else { 0.0 };
+<<<<<<< HEAD
              let p = 100.0 + signal + noise + spike;
              let v = rand::thread_rng().gen_range(0.1..5.0);
              (p, v)
+=======
+             (100.0 + signal + noise + spike, 0.1, 1.0)
+>>>>>>> feb49d06 (pushing local changes.)
         } else {
              match tokio::time::timeout(Duration::from_millis(100), ingest_rx.recv()).await {
                  Ok(Some(tick)) => {
                      now_ms = tick.timestamp as f64;
+<<<<<<< HEAD
                      market.update_book(tick.bid, tick.ask);
                      (tick.price, 0.0)
+=======
+                     let spread = if let (Some(bid), Some(ask)) = (tick.bid, tick.ask) {
+                         ask - bid
+                     } else {
+                         0.0 // Default/Stale
+                     };
+                     (tick.price, spread, tick.quantity)
+>>>>>>> feb49d06 (pushing local changes.)
                  },
                  Ok(None) => {
                      error!("❌ Ingestion Channel Closed!");
@@ -517,7 +538,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                  },
                  Err(_) => {
                      now_ms += 100.0;
+<<<<<<< HEAD
                      (market.price, 0.0)
+=======
+                     (market.price, 0.0, 0.0) 
+>>>>>>> feb49d06 (pushing local changes.)
                  }
              }
         };
@@ -533,14 +558,22 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             reflex::historian::events::MarketTickEvent {
                 timestamp: now_ms as u64,
                 price: price,
+<<<<<<< HEAD
                 volume: volume,
+=======
+                volume: volume, // D-110: Ingest volume
+>>>>>>> feb49d06 (pushing local changes.)
             }
         ));
 
         // D-79: Generate GSID
         let seq_id = sequencer.next();
+<<<<<<< HEAD
         let spread = market.get_spread();
         let state = feynman.update(market.price, now_ms, seq_id, spread);
+=======
+        let state = feynman.update(market.price, now_ms, spread, volume, seq_id);
+>>>>>>> feb49d06 (pushing local changes.)
         metrics.market_velocity.record(state.velocity, &kv);
         
         reflex::historian::logger::record_event(reflex::historian::events::LogEvent::Signal(
