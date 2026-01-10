@@ -15,9 +15,9 @@ pub mod historian; // D-82
 pub mod telemetry;
 pub mod sim;
 pub mod db;
-// pub mod db; // Removed duplicate
 pub mod server;
 pub mod sequencer;
+pub mod config; // Added config module
 
 // Import the generated code
 pub mod reflex_proto {

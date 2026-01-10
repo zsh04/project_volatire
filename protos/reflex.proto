@@ -27,6 +27,9 @@ service ReflexService {
   // D-107: Turn Key (Update Legislation)
   rpc UpdateLegislation (LegislativeUpdate) returns (Ack);
 
+  // D-106: Flatten Position
+  rpc ClosePosition (ClosePositionRequest) returns (Ack);
+
   // D-86: Sovereign Command Injection
   rpc InjectSovereignCommand (SovereignCommandRequest) returns (Ack);
 
@@ -49,6 +52,10 @@ message TickHistoryRequest {
 
 message ClosePositionRequest {
     string symbol = 1;
+}
+
+message CancelOrderRequest {
+    string order_id = 1;
 }
 
 message PhysicsResponse {

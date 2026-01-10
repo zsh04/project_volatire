@@ -149,7 +149,9 @@ mod tests {
     fn test_kraken_signature_structure() {
         // Since Kraken involves sha256(nonce + post) then hmac-sha512, harder to get a static test vector without a real key/time match
         // But we can verify it returns a valid base64 string
-        let signer = KrakenSigner::new("apikey", "kQH5HW/8p1uGOVjbgWA7FunAmGO8lsVI0505+q+tSmpurdF705gLGadq95jdgqBu1vLXf4+JZLtlGQFqc0Jj/g==").unwrap();
+        // Dummy key (Base64 encoded)
+        let dummy_key = BASE64_STANDARD.encode(b"ThisIsAFakeSecretKeyForTestingPurposeOnly123");
+        let signer = KrakenSigner::new("apikey", &dummy_key).unwrap();
         let sig = signer.sign("/0/private/AddOrder", 1616492376594, "nonce=1616492376594&ordertype=limit&pair=XBTUSD&price=37500&type=buy&volume=1.25");
         
         // It must be a valid base64 string
