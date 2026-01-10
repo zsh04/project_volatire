@@ -138,7 +138,7 @@ def extract_genesis_baseline(results: Dict[str, Any]) -> Dict[str, Any]:
 
     return {
         "ooda_jitter_us": vector_c.get("ooda_jitter_max_us", 0),
-        "gemma_latency_ms": 0,  # TODO: Extract from brain service
+        "gemma_latency_ms": vector_b.get("gemma_latency_ms", 0),
         "hud_fps": vector_a.get("stress_fps", 0),
         "worker_latency_ms": vector_a.get("worker_latency_p99_ms", 0),
     }
