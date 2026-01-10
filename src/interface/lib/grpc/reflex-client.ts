@@ -1,5 +1,5 @@
 import { ReflexServiceClient } from './generated/ReflexServiceClientPb';
-import { Empty, PhysicsResponse, OODAResponse, VetoRequest, LegislativeUpdate, CancelOrderRequest } from './generated/reflex_pb';
+import { Empty, PhysicsResponse, OODAResponse, VetoRequest, LegislativeUpdate, ClosePositionRequest } from './generated/reflex_pb';
 import { useMarketStore } from '../stores/market-store';
 import { useAgentStore } from '../stores/agent-store';
 import { useSystemStore } from '../stores/system-store';
@@ -176,21 +176,21 @@ export async function triggerVeto(reason: string, operator: string): Promise<boo
 }
 
 // D-109: Cancel Order
-export async function cancelOrder(orderId: string): Promise<boolean> {
+export async function closePosition(symbol: string): Promise<boolean> {
     const client = getReflexClient();
 
     return new Promise((resolve, reject) => {
-        const request = new CancelOrderRequest();
-        request.setOrderId(orderId);
+        const request = new ClosePositionRequest();
+        request.setSymbol(symbol);
 
-        client.cancelOrder(request, {}, (err, response) => {
+        client.closePosition(request, {}, (err, response) => {
             if (err) {
-                console.error('Cancel order failed:', err);
+                console.error('Close position failed:', err);
                 reject(err);
                 return;
             }
-            console.log('Cancel Confirmed:', response.getMessage());
-            resolve(true);
+            console.log(`Position closed for ${symbol}: ${response.getMessage()}`);
+            resolve(response.getSuccess());
         });
     });
 }

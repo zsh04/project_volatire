@@ -47,6 +47,10 @@ message TickHistoryRequest {
     double end_time = 3;   // Unix ms
 }
 
+message ClosePositionRequest {
+    string symbol = 1;
+}
+
 message PhysicsResponse {
     double price = 1;
     double velocity = 2;

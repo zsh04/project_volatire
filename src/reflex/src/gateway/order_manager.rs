@@ -137,4 +137,16 @@ impl OrderGateway {
         tracing::warn!("📛 GATEWAY: Sovereign CloseAll executed. Liquidated {} positions/orders.", count);
         Ok(count)
     }
+
+    /// D-106: Flatten Single Position
+    pub async fn close_position(&mut self, symbol: &str) -> Result<bool, String> {
+        // In real implementation:
+        // 1. Get position size from AccountSnapshot
+        // 2. Send Market Order (Sell if Long, Buy if Short)
+        // 3. Wait for fill
+        tracing::warn!("📛 GATEWAY: Flattening position for {}", symbol);
+
+        // Simulating success
+        Ok(true)
+    }
 }
