@@ -34,6 +34,7 @@ message ContextRequest {
     // D-87 Firewall: Hard Telemetry Injection
     string truth_envelope = 4; 
     string legislative_bias = 5; // D-107
+    string active_adapter = 6; // D-95
 }
 
 message ContextResponse {

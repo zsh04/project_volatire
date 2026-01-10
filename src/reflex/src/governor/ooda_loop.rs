@@ -175,16 +175,12 @@ impl OODACore {
                 _ => "Unknown",
             };
             self.ensemble_manager.update_regime(current_regime_name);
-            let _active_adapter = self.ensemble_manager.get_active_adapter();
+            let active_adapter = self.ensemble_manager.get_active_adapter();
 
-            // TODO: Pass `active_adapter` to client.get_context()
-            // For now, we just log it in the trace context or debug 
-            // tracing::debug!("Using Adapter: {}", active_adapter);
-            
             // Enforce Jitter Budget (e.g., 20ms) via Timeout
             match tokio::time::timeout(
                 self.jitter_threshold,
-                c.get_context(&truth, &legislative_bias) // D-107: Pass Bias
+                c.get_context(&truth, &legislative_bias, &active_adapter) // D-107: Pass Bias
             ).await {
                 Ok(Ok(ctx)) => {
                     // D-91: TEMPORAL SYNC-GATE

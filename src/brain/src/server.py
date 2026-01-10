@@ -208,19 +208,16 @@ class BrainService(brain_pb2_grpc.BrainServiceServicer):
     async def GetContext(self, request, context):
         start = time.time()
 
-        # D-95: Extract intended adapter from request (if we had the field in proto)
-        # For now, we simulate the Router logic:
-        # Ideally: adapter_id = request.adapter_id
-        # self.router.inference(..., adapter_id)
-
-        # Since proto isn't updated, we assume the router is stateful or defaults.
-        # Impl Note: We need to update PROTO to pass adapter_id if we want per-request control.
-        # But for this step, we just show integration.
-
-        flavor = self.router.inference("Market Data...")
+        # D-95: Extract intended adapter from request
+        # If active_adapter is not present or empty, fallback to router inference or default.
+        adapter_id = getattr(request, "active_adapter", None)
+        if adapter_id:
+             flavor = adapter_id
+        else:
+             flavor = self.router.inference("Market Data...")
 
         reasoning = (
-            f"{flavor}: Market implies hold. Acceleration {request.acceleration:.2f}"
+            f"{flavor}: Market implies hold. Acceleration {getattr(request, 'acceleration', 0.0):.2f}"
         )
         """
         D-54: Live Semantic Context.

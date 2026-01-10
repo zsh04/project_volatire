@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0creflex.proto\x12\x06reflex\"\x94\x01\n\x0fPhysicsResponse\x12\r\n\x05price\x18\x01 \x01(\x01\x12\x10\n\x08velocity\x18\x02 \x01(\x01\x12\x14\n\x0c\x61\x63\x63\x65leration\x18\x03 \x01(\x01\x12\x0c\n\x04jerk\x18\x04 \x01(\x01\x12\x0f\n\x07\x65ntropy\x18\x05 \x01(\x01\x12\x18\n\x10\x65\x66\x66iciency_index\x18\x06 \x01(\x01\x12\x11\n\ttimestamp\x18\x07 \x01(\x01\"\x90\x02\n\x0cOODAResponse\x12(\n\x07physics\x18\x01 \x01(\x0b\x32\x17.reflex.PhysicsResponse\x12\x1c\n\x0fsentiment_score\x18\x02 \x01(\x01H\x00\x88\x01\x01\x12\x1b\n\x0enearest_regime\x18\x03 \x01(\tH\x01\x88\x01\x01\x12\x10\n\x08\x64\x65\x63ision\x18\x04 \x01(\t\x12\x32\n\x07weights\x18\x05 \x03(\x0b\x32!.reflex.OODAResponse.WeightsEntry\x1a.\n\x0cWeightsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x01:\x02\x38\x01\x42\x12\n\x10_sentiment_scoreB\x11\n\x0f_nearest_regime\"/\n\x0bVetoRequest\x12\x0e\n\x06reason\x18\x01 \x01(\t\x12\x10\n\x08operator\x18\x02 \x01(\t\"5\n\rDemoteRequest\x12\x0e\n\x06reason\x18\x01 \x01(\t\x12\x14\n\x0ctarget_level\x18\x02 \x01(\t\"\x83\x01\n\x0eRatchetRequest\x12+\n\x05level\x18\x01 \x01(\x0e\x32\x1c.reflex.RatchetRequest.Level\x12\x0e\n\x06reason\x18\x02 \x01(\t\"4\n\x05Level\x12\x08\n\x04IDLE\x10\x00\x12\x0b\n\x07TIGHTEN\x10\x01\x12\n\n\x06\x46REEZE\x10\x02\x12\x08\n\x04KILL\x10\x03\"+\n\rConfigPayload\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x01\"d\n\tHeartbeat\x12\x11\n\ttimestamp\x18\x01 \x01(\x01\x12\x17\n\x0f\x62rain_connected\x18\x02 \x01(\x08\x12\x18\n\x10\x65\x66\x66iciency_index\x18\x03 \x01(\x01\x12\x11\n\tp_riemann\x18\x04 \x01(\x01\"\'\n\x03\x41\x63k\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\"\x07\n\x05\x45mpty2\xfb\x02\n\rReflexService\x12\x34\n\nGetPhysics\x12\r.reflex.Empty\x1a\x17.reflex.PhysicsResponse\x12.\n\x07GetOODA\x12\r.reflex.Empty\x1a\x14.reflex.OODAResponse\x12/\n\x0bTriggerVeto\x12\x13.reflex.VetoRequest\x1a\x0b.reflex.Ack\x12\x37\n\x11\x44\x65moteProvisional\x12\x15.reflex.DemoteRequest\x1a\x0b.reflex.Ack\x12\x35\n\x0eTriggerRatchet\x12\x16.reflex.RatchetRequest\x1a\x0b.reflex.Ack\x12\x32\n\x0cUpdateConfig\x12\x15.reflex.ConfigPayload\x1a\x0b.reflex.Ack\x12/\n\tGetStream\x12\r.reflex.Empty\x1a\x11.reflex.Heartbeat0\x01\x62\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0creflex.proto\x12\x06reflex\"J\n\x12TickHistoryRequest\x12\x0e\n\x06symbol\x18\x01 \x01(\t\x12\x12\n\nstart_time\x18\x02 \x01(\x01\x12\x10\n\x08\x65nd_time\x18\x03 \x01(\x01\"\x91\x05\n\x0fPhysicsResponse\x12\r\n\x05price\x18\x01 \x01(\x01\x12\x10\n\x08velocity\x18\x02 \x01(\x01\x12\x14\n\x0c\x61\x63\x63\x65leration\x18\x03 \x01(\x01\x12\x0c\n\x04jerk\x18\x04 \x01(\x01\x12\x0f\n\x07\x65ntropy\x18\x05 \x01(\x01\x12\x18\n\x10\x65\x66\x66iciency_index\x18\x06 \x01(\x01\x12\x11\n\ttimestamp\x18\x07 \x01(\x01\x12\x13\n\x0bsequence_id\x18\x10 \x01(\x03\x12\x16\n\x0eunrealized_pnl\x18\x08 \x01(\x01\x12\x0e\n\x06\x65quity\x18\t \x01(\x01\x12\x0f\n\x07\x62\x61lance\x18\n \x01(\x01\x12\x14\n\x0crealized_pnl\x18\x17 \x01(\x01\x12\x14\n\x0c\x62tc_position\x18\x18 \x01(\x01\x12\x1c\n\x14gemma_tokens_per_sec\x18\x0b \x01(\x01\x12\x18\n\x10gemma_latency_ms\x18\x0c \x01(\x01\x12\x16\n\x0estaircase_tier\x18\r \x01(\x05\x12\x1a\n\x12staircase_progress\x18\x0e \x01(\x01\x12\x13\n\x0b\x61udit_drift\x18\x0f \x01(\x01\x12\x19\n\x11system_latency_us\x18\x11 \x01(\x01\x12\x18\n\x10system_jitter_us\x18\x12 \x01(\x01\x12\x17\n\x0fvitality_status\x18\x13 \x01(\t\x12.\n\x0freasoning_trace\x18\x14 \x03(\x0b\x32\x15.reflex.ReasoningStep\x12\x17\n\x0fignition_status\x18\x15 \x01(\t\x12\x1b\n\x13system_sanity_score\x18\x16 \x01(\x01\x12(\n\tpositions\x18\x19 \x03(\x0b\x32\x15.reflex.PositionState\x12\"\n\x06orders\x18\x1a \x03(\x0b\x32\x12.reflex.OrderState\"\x92\x01\n\rPositionState\x12\x0e\n\x06symbol\x18\x01 \x01(\t\x12\x10\n\x08net_size\x18\x02 \x01(\x01\x12\x17\n\x0f\x61vg_entry_price\x18\x03 \x01(\x01\x12\x16\n\x0eunrealized_pnl\x18\x04 \x01(\x01\x12\x17\n\x0f\x65ntry_timestamp\x18\x05 \x01(\x03\x12\x15\n\rcurrent_price\x18\x06 \x01(\x01\"\x86\x01\n\nOrderState\x12\x10\n\x08order_id\x18\x01 \x01(\t\x12\x0e\n\x06symbol\x18\x02 \x01(\t\x12\x0c\n\x04side\x18\x03 \x01(\t\x12\x10\n\x08quantity\x18\x04 \x01(\x01\x12\x13\n\x0blimit_price\x18\x05 \x01(\x01\x12\x0e\n\x06status\x18\x06 \x01(\t\x12\x11\n\ttimestamp\x18\x07 \x01(\x03\"b\n\rReasoningStep\x12\n\n\x02id\x18\x01 \x01(\t\x12\x0f\n\x07\x63ontent\x18\x02 \x01(\t\x12\x13\n\x0bprobability\x18\x03 \x01(\x01\x12\x0c\n\x04type\x18\x04 \x01(\t\x12\x11\n\ttimestamp\x18\x05 \x01(\x01\"\x90\x02\n\x0cOODAResponse\x12(\n\x07physics\x18\x01 \x01(\x0b\x32\x17.reflex.PhysicsResponse\x12\x1c\n\x0fsentiment_score\x18\x02 \x01(\x01H\x00\x88\x01\x01\x12\x1b\n\x0enearest_regime\x18\x03 \x01(\tH\x01\x88\x01\x01\x12\x10\n\x08\x64\x65\x63ision\x18\x04 \x01(\t\x12\x32\n\x07weights\x18\x05 \x03(\x0b\x32!.reflex.OODAResponse.WeightsEntry\x1a.\n\x0cWeightsEntry\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x01:\x02\x38\x01\x42\x12\n\x10_sentiment_scoreB\x11\n\x0f_nearest_regime\"/\n\x0bVetoRequest\x12\x0e\n\x06reason\x18\x01 \x01(\t\x12\x10\n\x08operator\x18\x02 \x01(\t\"5\n\rDemoteRequest\x12\x0e\n\x06reason\x18\x01 \x01(\t\x12\x14\n\x0ctarget_level\x18\x02 \x01(\t\"\x83\x01\n\x0eRatchetRequest\x12+\n\x05level\x18\x01 \x01(\x0e\x32\x1c.reflex.RatchetRequest.Level\x12\x0e\n\x06reason\x18\x02 \x01(\t\"4\n\x05Level\x12\x08\n\x04IDLE\x10\x00\x12\x0b\n\x07TIGHTEN\x10\x01\x12\n\n\x06\x46REEZE\x10\x02\x12\x08\n\x04KILL\x10\x03\"y\n\x11LegislativeUpdate\x12\x0c\n\x04\x62ias\x18\x01 \x01(\t\x12\x12\n\naggression\x18\x02 \x01(\x01\x12\x12\n\nmaker_only\x18\x03 \x01(\x08\x12\x13\n\x0bhibernation\x18\x04 \x01(\x08\x12\x19\n\x11snap_to_breakeven\x18\x05 \x01(\x08\"+\n\rConfigPayload\x12\x0b\n\x03key\x18\x01 \x01(\t\x12\r\n\x05value\x18\x02 \x01(\x01\"d\n\tHeartbeat\x12\x11\n\ttimestamp\x18\x01 \x01(\x01\x12\x17\n\x0f\x62rain_connected\x18\x02 \x01(\x08\x12\x18\n\x10\x65\x66\x66iciency_index\x18\x03 \x01(\x01\x12\x11\n\tp_riemann\x18\x04 \x01(\x01\"\'\n\x03\x41\x63k\x12\x0f\n\x07success\x18\x01 \x01(\x08\x12\x0f\n\x07message\x18\x02 \x01(\t\"\x07\n\x05\x45mpty2\xb7\x04\n\rReflexService\x12\x34\n\nGetPhysics\x12\r.reflex.Empty\x1a\x17.reflex.PhysicsResponse\x12.\n\x07GetOODA\x12\r.reflex.Empty\x1a\x14.reflex.OODAResponse\x12/\n\x0bTriggerVeto\x12\x13.reflex.VetoRequest\x1a\x0b.reflex.Ack\x12\x37\n\x11\x44\x65moteProvisional\x12\x15.reflex.DemoteRequest\x1a\x0b.reflex.Ack\x12G\n\x0eGetTickHistory\x12\x1a.reflex.TickHistoryRequest\x1a\x17.reflex.PhysicsResponse0\x01\x12.\n\x10InitiateIgnition\x12\r.reflex.Empty\x1a\x0b.reflex.Ack\x12;\n\x11UpdateLegislation\x12\x19.reflex.LegislativeUpdate\x1a\x0b.reflex.Ack\x12\x35\n\x0eTriggerRatchet\x12\x16.reflex.RatchetRequest\x1a\x0b.reflex.Ack\x12\x32\n\x0cUpdateConfig\x12\x15.reflex.ConfigPayload\x1a\x0b.reflex.Ack\x12\x35\n\tGetStream\x12\r.reflex.Empty\x1a\x17.reflex.PhysicsResponse0\x01\x62\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -33,28 +33,38 @@ if not _descriptor._USE_C_DESCRIPTORS:
   DESCRIPTOR._loaded_options = None
   _globals['_OODARESPONSE_WEIGHTSENTRY']._loaded_options = None
   _globals['_OODARESPONSE_WEIGHTSENTRY']._serialized_options = b'8\001'
-  _globals['_PHYSICSRESPONSE']._serialized_start=25
-  _globals['_PHYSICSRESPONSE']._serialized_end=173
-  _globals['_OODARESPONSE']._serialized_start=176
-  _globals['_OODARESPONSE']._serialized_end=448
-  _globals['_OODARESPONSE_WEIGHTSENTRY']._serialized_start=363
-  _globals['_OODARESPONSE_WEIGHTSENTRY']._serialized_end=409
-  _globals['_VETOREQUEST']._serialized_start=450
-  _globals['_VETOREQUEST']._serialized_end=497
-  _globals['_DEMOTEREQUEST']._serialized_start=499
-  _globals['_DEMOTEREQUEST']._serialized_end=552
-  _globals['_RATCHETREQUEST']._serialized_start=555
-  _globals['_RATCHETREQUEST']._serialized_end=686
-  _globals['_RATCHETREQUEST_LEVEL']._serialized_start=634
-  _globals['_RATCHETREQUEST_LEVEL']._serialized_end=686
-  _globals['_CONFIGPAYLOAD']._serialized_start=688
-  _globals['_CONFIGPAYLOAD']._serialized_end=731
-  _globals['_HEARTBEAT']._serialized_start=733
-  _globals['_HEARTBEAT']._serialized_end=833
-  _globals['_ACK']._serialized_start=835
-  _globals['_ACK']._serialized_end=874
-  _globals['_EMPTY']._serialized_start=876
-  _globals['_EMPTY']._serialized_end=883
-  _globals['_REFLEXSERVICE']._serialized_start=886
-  _globals['_REFLEXSERVICE']._serialized_end=1265
+  _globals['_TICKHISTORYREQUEST']._serialized_start=24
+  _globals['_TICKHISTORYREQUEST']._serialized_end=98
+  _globals['_PHYSICSRESPONSE']._serialized_start=101
+  _globals['_PHYSICSRESPONSE']._serialized_end=758
+  _globals['_POSITIONSTATE']._serialized_start=761
+  _globals['_POSITIONSTATE']._serialized_end=907
+  _globals['_ORDERSTATE']._serialized_start=910
+  _globals['_ORDERSTATE']._serialized_end=1044
+  _globals['_REASONINGSTEP']._serialized_start=1046
+  _globals['_REASONINGSTEP']._serialized_end=1144
+  _globals['_OODARESPONSE']._serialized_start=1147
+  _globals['_OODARESPONSE']._serialized_end=1419
+  _globals['_OODARESPONSE_WEIGHTSENTRY']._serialized_start=1334
+  _globals['_OODARESPONSE_WEIGHTSENTRY']._serialized_end=1380
+  _globals['_VETOREQUEST']._serialized_start=1421
+  _globals['_VETOREQUEST']._serialized_end=1468
+  _globals['_DEMOTEREQUEST']._serialized_start=1470
+  _globals['_DEMOTEREQUEST']._serialized_end=1523
+  _globals['_RATCHETREQUEST']._serialized_start=1526
+  _globals['_RATCHETREQUEST']._serialized_end=1657
+  _globals['_RATCHETREQUEST_LEVEL']._serialized_start=1605
+  _globals['_RATCHETREQUEST_LEVEL']._serialized_end=1657
+  _globals['_LEGISLATIVEUPDATE']._serialized_start=1659
+  _globals['_LEGISLATIVEUPDATE']._serialized_end=1780
+  _globals['_CONFIGPAYLOAD']._serialized_start=1782
+  _globals['_CONFIGPAYLOAD']._serialized_end=1825
+  _globals['_HEARTBEAT']._serialized_start=1827
+  _globals['_HEARTBEAT']._serialized_end=1927
+  _globals['_ACK']._serialized_start=1929
+  _globals['_ACK']._serialized_end=1968
+  _globals['_EMPTY']._serialized_start=1970
+  _globals['_EMPTY']._serialized_end=1977
+  _globals['_REFLEXSERVICE']._serialized_start=1980
+  _globals['_REFLEXSERVICE']._serialized_end=2547
 # @@protoc_insertion_point(module_scope)
