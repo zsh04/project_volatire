@@ -3,6 +3,7 @@ use deadpool_postgres::{Config, Pool, Runtime};
 use tokio::sync::mpsc;
 use tokio_postgres::NoTls;
 use tracing::{info, error};
+use crate::feynman::PhysicsState;
 
 
 #[derive(Debug, Clone)]
@@ -21,32 +22,33 @@ pub struct FrictionLog {
 }
 
 #[derive(Debug, Clone)]
-pub struct TickLog {
-    pub symbol: String,
-    pub price: f64,
-    pub quantity: f64,
-    pub ts: i64, // nanos
-}
-
-#[derive(Debug, Clone)]
-pub enum AuditLog {
-    Friction(FrictionLog),
-    Tick(TickLog),
+pub struct ForensicLog {
+    pub timestamp: f64,
+    pub trace_id: String,
+    pub physics: PhysicsState,
+    pub sentiment: f64,
+    pub vector_distance: f64,
+    pub quantile_score: i32,
+    pub decision: String,
+    pub operator_hash: String,
 }
 
 #[derive(Clone)]
 pub struct QuestBridge {
-    ilp_sender: mpsc::Sender<AuditLog>,
+    ilp_sender: mpsc::Sender<FrictionLog>,
+    forensic_sender: mpsc::Sender<ForensicLog>,
     sql_pool: Pool,
 }
 
 impl QuestBridge {
     pub async fn new(ilp_host: &str, sql_host: &str, user: &str, pass: &str, db: &str) -> Self {
         // 1. ILP Channel Setup
-        let (tx, mut rx) = mpsc::channel::<AuditLog>(4096);
+        let (tx, mut rx) = mpsc::channel::<FrictionLog>(4096);
+        let (tx_forensic, mut rx_forensic) = mpsc::channel::<ForensicLog>(4096);
         let ilp_host_owned = ilp_host.to_string();
+        let ilp_host_forensic = ilp_host.to_string();
 
-        // 2. Spawn ILP Worker
+        // 2. Spawn ILP Worker (FrictionLog)
         tokio::spawn(async move {
             use questdb::ingress::TimestampNanos; // Ensure this is available
 
@@ -110,6 +112,59 @@ impl QuestBridge {
             }
         });
 
+        // 2b. Spawn ILP Worker (ForensicLog)
+        tokio::spawn(async move {
+            use questdb::ingress::TimestampNanos;
+
+            info!("QuestDB Forensic Worker: Connecting to {}", ilp_host_forensic);
+            let mut sender = match Sender::from_conf(&format!("tcp::addr={};", ilp_host_forensic)) {
+                Ok(s) => s,
+                Err(e) => {
+                    error!("Failed to create ILP Sender for Forensic: {}", e);
+                    return;
+                }
+            };
+
+            let mut buffer = Buffer::new(ProtocolVersion::V3);
+
+            while let Some(log) = rx_forensic.recv().await {
+                 let serialization_result = (|| -> Result<(), questdb::Error> {
+                    let ts_nanos = (log.timestamp * 1_000_000.0) as i64;
+
+                    buffer.table("forensic_events")?
+                        .symbol("trace_id", &log.trace_id)?
+                        .symbol("decision", &log.decision)?
+                        .symbol("operator_hash", &log.operator_hash)?
+                        .column_f64("sentiment", log.sentiment)?
+                        .column_f64("vector_distance", log.vector_distance)?
+                        .column_i64("quantile_score", log.quantile_score as i64)?
+                        // Physics Flattening
+                        .column_f64("physics_price", log.physics.price)?
+                        .column_f64("physics_velocity", log.physics.velocity)?
+                        .column_f64("physics_acceleration", log.physics.acceleration)?
+                        .column_f64("physics_jerk", log.physics.jerk)?
+                        .column_f64("physics_volatility", log.physics.volatility)?
+                        .column_f64("physics_entropy", log.physics.entropy)?
+                        .column_f64("physics_efficiency", log.physics.efficiency_index)?
+                        .column_f64("physics_basis", log.physics.basis)?
+                        .column_i64("physics_seq", log.physics.sequence_id as i64)?
+                        .at(TimestampNanos::new(ts_nanos))?;
+                    Ok(())
+                 })();
+
+                 if let Err(e) = serialization_result {
+                     error!("QuestDB Forensic Serialization Failed: {}", e);
+                     buffer.clear();
+                     continue;
+                 }
+
+                if let Err(e) = sender.flush(&mut buffer) {
+                    error!("QuestDB Forensic ILP Flush Failed: {}", e);
+                    buffer.clear();
+                }
+            }
+        });
+
         // 3. SQL Pool Setup
         let mut cfg = Config::new();
         cfg.host = Some(sql_host.to_string());
@@ -122,6 +177,7 @@ impl QuestBridge {
 
         QuestBridge {
             ilp_sender: tx,
+            forensic_sender: tx_forensic,
             sql_pool: pool,
         }
     }
