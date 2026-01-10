@@ -71,6 +71,7 @@ use crate::auditor::nullifier::Nullifier; // D-88
 use crate::auditor::red_team::RedTeam; // D-93
 use crate::governor::ensemble_manager::EnsembleManager; // D-95
 use crate::governor::health::PhoenixMonitor; // D-96
+use crate::db::state::RedisStateStore;
 
 pub use crate::sequencer::sync_gate::SyncGate;
 use crate::sequencer::shadow_gate::ShadowGate; // D-91
@@ -93,6 +94,7 @@ pub struct OODACore {
     pub forensic_tx: Option<mpsc::Sender<DecisionPacket>>,
     pub mirror_tx: Option<mpsc::Sender<DecisionPacket>>,
     pub decay_tx: Option<mpsc::Sender<DecisionPacket>>,
+    pub state_store: RedisStateStore,
 }
 
 use crate::client::BrainClient;
@@ -102,7 +104,8 @@ impl OODACore {
         symbol: String,
         forensic_tx: Option<mpsc::Sender<DecisionPacket>>,
         mirror_tx: Option<mpsc::Sender<DecisionPacket>>,
-        decay_tx: Option<mpsc::Sender<DecisionPacket>>
+        decay_tx: Option<mpsc::Sender<DecisionPacket>>,
+        state_store: RedisStateStore,
     ) -> Self {
         Self {
             jitter_threshold: Duration::from_millis(20),
@@ -120,6 +123,7 @@ impl OODACore {
             mirror_tx,
             decay_tx,
             symbol,
+            state_store,
         }
     }
 
@@ -477,7 +481,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_veto_logic() {
-        let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None);
+        let store = RedisStateStore::new("redis://127.0.0.1:6379/").await.unwrap();
+        let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None, store);
         
         // Case: Bullish Physics
         let physics = PhysicsState {
@@ -504,7 +509,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_jitter_fallback_logic() {
-        let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None);
+        let store = RedisStateStore::new("redis://127.0.0.1:6379/").await.unwrap();
+        let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None, store);
         let physics = PhysicsState {
             price: 50000.0,
             velocity: 10.0,
@@ -540,7 +546,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_cycle_latency() {
-        let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None);
+        let store = RedisStateStore::new("redis://127.0.0.1:6379/").await.unwrap();
+        let mut core = OODACore::new("BTC-USDT".to_string(), None, None, None, store);
         let physics = PhysicsState {
             price: 50000.0,
             velocity: 0.0,
