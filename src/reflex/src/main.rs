@@ -273,12 +273,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Update OODA Core with Decay Channel
     let mut ooda = reflex::governor::ooda_loop::OODACore::new("BTC-USDT".to_string(), Some(forensic_tx), Some(mirror_tx), Some(decay_tx));
 
+    // D-86: Authority Bridge (Sovereign Command Channel)
+    let (mut authority_bridge, authority_tx) = reflex::governor::authority::AuthorityBridge::new();
+
     // Spawn API Server
     let server_state = shared_state.clone();
     let server_tx = tx_broadcast.clone(); // Pass Sender for subscribing
-    let authority_tx_for_server = authority_tx.clone();
+    let server_auth_tx = authority_tx.clone();
     let _server_handle = tokio::spawn(async move {
-        reflex::server::run_server(server_state, server_tx, authority_tx_for_server).await;
+        reflex::server::run_server(server_state, server_tx, server_auth_tx).await;
     });
 
 

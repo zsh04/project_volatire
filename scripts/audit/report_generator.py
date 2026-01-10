@@ -115,9 +115,9 @@ def validate_gate_c(results: Dict[str, Any]) -> Dict[str, Any]:
 
     max_jitter_us = vector_c.get("ooda_jitter_max_us", 999)
 
-    # TODO: Extract std dev from perf output
-    # For now, assume std dev is ~30% of max
-    std_dev_us = max_jitter_us * 0.3
+    # Extract std dev from perf output (populated by vector_c_jitter_audit.sh)
+    # Default to estimation if missing (backward compatibility)
+    std_dev_us = vector_c.get("ooda_jitter_std_dev_us", max_jitter_us * 0.3)
 
     passed = std_dev_us < 15.0 and max_jitter_us < 50.0
 

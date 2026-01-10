@@ -1,6 +1,7 @@
 use reflex::governor::ooda_loop::{OODACore, PhysicsState, OODAState};
 use reflex::governor::legislator::LegislativeState;
 use reflex::telemetry;
+use reflex::governor::legislator::LegislativeState;
 use std::time::Duration;
 use tracing::info;
 
@@ -14,6 +15,7 @@ async fn test_telemetry_emission() {
 
     // 2. Setup OODA
     let mut ooda = OODACore::new(None, None, None);
+    let legislation = LegislativeState::default();
     
     // 3. Create Mock State
     let physics = PhysicsState {

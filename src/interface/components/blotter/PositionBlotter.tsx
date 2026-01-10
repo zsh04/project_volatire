@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useSystemStore } from '@/lib/stores/system-store';
 import { formatDistanceToNow } from 'date-fns';
+import { closePosition } from '@/lib/grpc/reflex-client';
 
 /**
  * Directive-105: Position Blotter (The Ledger)
@@ -15,9 +16,13 @@ export function PositionBlotter() {
         return positions.reduce((acc, p) => acc + (Math.abs(p.netSize) * p.avgEntryPrice), 0);
     }, [positions]);
 
-    const handleFlatten = (symbol: string) => {
+    const handleFlatten = async (symbol: string) => {
         console.log(`[TACTICAL] FLATTEN REQUEST: ${symbol}`);
-        // TODO: Wire to RPC RPC (D-106)
+        try {
+            await closePosition(symbol);
+        } catch (err) {
+            console.error('[TACTICAL] FLATTEN FAILED:', err);
+        }
     };
 
     return (

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useSystemStore } from '@/lib/stores/system-store';
 import { formatDistanceToNow } from 'date-fns';
 import { Filter, XCircle, CheckCircle, Clock } from 'lucide-react';
+import { cancelOrder } from '@/lib/grpc/reflex-client'; // D-109
 
 /**
  * Directive-105: Order Queue (Tactical Manager)
@@ -14,9 +15,14 @@ export function OrderQueue() {
     // UI State for "Maker Only" Toggle (Mock for now, normally D-106)
     const [makerOnly, setMakerOnly] = useState(true);
 
-    const handleCancel = (id: string) => {
+    const handleCancel = async (id: string) => {
         console.log(`[TACTICAL] CANCEL ORDER: ${id}`);
-        // TODO: Wire to RPC
+        try {
+            await cancelOrder(id);
+            // Optimistic update could happen here, or wait for stream
+        } catch (e) {
+            console.error("Failed to cancel order", e);
+        }
     };
 
     const handleCancelAll = () => {

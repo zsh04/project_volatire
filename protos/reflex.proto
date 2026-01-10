@@ -12,6 +12,9 @@ service ReflexService {
   // 3. Trigger Veto (Nuclear Option)
   rpc TriggerVeto (VetoRequest) returns (Ack);
 
+  // 3.5 Cancel Order (Tactical)
+  rpc CancelOrder (CancelOrderRequest) returns (Ack);
+
   // 4. Demote Provisional (Safety Staircase)
   rpc DemoteProvisional (DemoteRequest) returns (Ack);
 
@@ -23,6 +26,9 @@ service ReflexService {
 
   // D-107: Turn Key (Update Legislation)
   rpc UpdateLegislation (LegislativeUpdate) returns (Ack);
+
+  // D-86: Sovereign Command Injection
+  rpc InjectSovereignCommand (SovereignCommandRequest) returns (Ack);
 
   // --- Legacy / Aux ---
   // Force a risk level change
@@ -39,6 +45,10 @@ message TickHistoryRequest {
     string symbol = 1;
     double start_time = 2; // Unix ms
     double end_time = 3;   // Unix ms
+}
+
+message ClosePositionRequest {
+    string symbol = 1;
 }
 
 message PhysicsResponse {
@@ -128,6 +138,21 @@ message OODAResponse {
 message VetoRequest {
     string reason = 1;
     string operator = 2;
+}
+
+message SovereignCommandRequest {
+  enum CommandType {
+    UNKNOWN = 0;
+    KILL = 1;
+    VETO = 2;
+    PAUSE = 3;
+    RESUME = 4;
+    CLOSE_ALL = 5;
+    SET_SENTIMENT = 6;
+    CLEAR_SENTIMENT = 7;
+  }
+  CommandType type = 1;
+  double sentiment_value = 2; // Used if type == SET_SENTIMENT
 }
 
 message DemoteRequest {

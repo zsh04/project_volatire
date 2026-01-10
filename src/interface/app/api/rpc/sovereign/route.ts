@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import type { SovereignCommandRequest, SovereignCommandResponse } from '@/lib/governance';
 import { getReflexClient } from '@/lib/rpc/client';
 import * as grpc from '@grpc/grpc-js';
+import { cookies } from 'next/headers';
 
 /**
  * Directive-86: Sovereign Command API Endpoint
@@ -132,8 +133,22 @@ export async function POST(request: Request): Promise<NextResponse<SovereignComm
             }
         });
 
+        // Determine User ID
+        // Priority: X-User-ID header > Cookie > Default 'pilot'
+        let userId = request.headers.get('x-user-id');
+        if (!userId) {
+            const cookieStore = cookies();
+            const userIdCookie = cookieStore.get('sovereign_user_id');
+            if (userIdCookie) {
+                userId = userIdCookie.value;
+            }
+        }
+
+        // Sanitize User ID (simple alpha-numeric check, fallback to 'pilot')
+        const safeUserId = userId ? userId.replace(/[^a-zA-Z0-9_-]/g, '') : 'pilot';
+
         // Log to audit trail (QuestDB)
-        await logSovereignCommand(req);
+        await logSovereignCommand(req, safeUserId);
 
         const latency_ms = Date.now() - startTime;
 
@@ -176,12 +191,12 @@ async function verifyWebAuthnSignature(
 /**
  * Log sovereign command to QuestDB audit trail
  */
-async function logSovereignCommand(req: SovereignCommandRequest): Promise<void> {
+async function logSovereignCommand(req: SovereignCommandRequest, userId: string): Promise<void> {
     const logEntry = {
         timestamp: new Date().toISOString(),
         command: req.command,
         payload: req.payload ?? null,
-        user_id: 'pilot', // TODO: Get from session
+        user_id: userId,
         signature: req.signature ? 'present' : 'none',
         latency_us: (Date.now() - req.timestamp) * 1000,
         source: 'WEB',

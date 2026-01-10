@@ -8,6 +8,7 @@ use crate::telemetry::forensics::DecisionPacket;
 use tokio::sync::mpsc;
 use opentelemetry::trace::TraceContextExt;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
+use crate::governor::legislator::LegislativeState; // D-107
 
 #[derive(Debug, Clone)]
 pub struct OODAState {
@@ -283,7 +284,7 @@ impl OODACore {
     /// Now includes Directive-43: Provisional Risk Sizing
     /// Now includes Directive-45: Nuclear Veto (Double-Key)
     #[tracing::instrument(skip(self))]
-    pub fn decide(&mut self, state: &OODAState, legislation: &crate::governor::legislator::LegislativeState) -> Decision {
+    pub fn decide(&mut self, state: &OODAState, legislation: &LegislativeState) -> Decision {
         let physics = &state.physics;
         
         // 1. Update Sentinel Components
@@ -554,6 +555,7 @@ mod tests {
 
         let legislation = LegislativeState::default();
         let start = Instant::now();
+        let legislation = crate::governor::legislator::LegislativeState::default();
         for _ in 0..10_000 {
             // Using logic internal simulation for speed test
             let state = core.orient(physics.clone(), 0, None, "Neutral".to_string()).await;
