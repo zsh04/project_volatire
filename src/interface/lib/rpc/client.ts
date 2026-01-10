@@ -2,7 +2,7 @@ import * as grpc from '@grpc/grpc-js';
 import * as protoLoader from '@grpc/proto-loader';
 import path from 'path';
 
-const PROTO_PATH = path.join(process.cwd(), 'src/interface/lib/rpc/protos/reflex.proto');
+const PROTO_PATH = path.join(process.cwd(), 'lib/rpc/protos/reflex.proto');
 
 // In production (Vercel/Docker), the path might be different.
 // We rely on the build process to place the proto file in the correct location or use a relative path.
